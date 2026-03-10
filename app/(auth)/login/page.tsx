@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { signIn, getCurrentUser } from "@/lib/services/auth";
-import { getProfile } from "@/lib/services/profile";
+import { getTravelerProfile } from "@/lib/services/profile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,12 +47,13 @@ export default function LoginPage() {
         return;
       }
 
-      const { data: profile, error: profileError } = await getProfile(supabase, user.id);
+      // Check if user has completed onboarding
+      const { data: travelerProfile } = await getTravelerProfile(supabase, user.id);
 
-      if (profileError || !profile || !profile.display_name) {
-        router.push("/onboarding");
-      } else {
+      if (travelerProfile?.onboarding_completed) {
         router.push("/dashboard");
+      } else {
+        router.push("/onboarding");
       }
 
       router.refresh();

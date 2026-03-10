@@ -16,6 +16,7 @@ import type { DimensionKey } from "@/lib/constants/dimensions";
 import SwipeCardStack from "@/components/onboarding/SwipeCardStack";
 import InterestPicker from "@/components/onboarding/InterestPicker";
 import DreamDayCreator from "@/components/onboarding/DreamDayCreator";
+import TypeReveal from "@/components/onboarding/TypeReveal";
 import { Button } from "@/components/ui/button";
 
 type Stage = "swipe" | "interests" | "dream_day" | "reveal";
@@ -286,51 +287,22 @@ export default function OnboardingPage() {
 
   if (stage === "reveal" && revealData) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-8 px-6">
-        <div className="text-center">
-          <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            You are
-          </p>
-          <h1 className="mt-2 text-4xl font-bold">{revealData.type_name}</h1>
-          <p className="mt-1 font-mono text-lg text-muted-foreground">
-            {revealData.type_code}
-          </p>
-        </div>
-        <div className="w-full max-w-xs space-y-3">
-          <ScoreRow label="Plan vs Flow" value={revealData.plan_flow_score} />
-          <ScoreRow label="Busy vs Relaxed" value={revealData.busy_relaxed_score} />
-          <ScoreRow label="Comfort vs Discomfort" value={revealData.comfort_discomfort_score} />
-          <ScoreRow label="Immerse vs Observe" value={revealData.immerse_observe_score} />
-        </div>
-        <Button
-          className="w-full max-w-xs"
-          onClick={() => {
-            router.push("/dashboard");
-            router.refresh();
-          }}
-        >
-          Go to Dashboard
-        </Button>
-      </div>
+      <TypeReveal
+        typeCode={revealData.type_code}
+        typeName={revealData.type_name}
+        scores={{
+          plan_flow_score: revealData.plan_flow_score,
+          busy_relaxed_score: revealData.busy_relaxed_score,
+          comfort_discomfort_score: revealData.comfort_discomfort_score,
+          immerse_observe_score: revealData.immerse_observe_score,
+        }}
+        onContinue={() => {
+          router.push("/dashboard");
+          router.refresh();
+        }}
+      />
     );
   }
 
   return null;
-}
-
-function ScoreRow({ label, value }: { label: string; value: number }) {
-  return (
-    <div>
-      <div className="mb-1 flex justify-between text-sm">
-        <span>{label}</span>
-        <span className="font-mono text-muted-foreground">{value}</span>
-      </div>
-      <div className="h-2 rounded-full bg-muted">
-        <div
-          className="h-2 rounded-full bg-primary transition-all"
-          style={{ width: `${value}%` }}
-        />
-      </div>
-    </div>
-  );
 }
