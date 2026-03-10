@@ -1,15 +1,4 @@
-export type SwipeCard = {
-  id: number;
-  caption: string;
-  imageUrl: string;
-  tier: "anchor" | "compound" | "full_spectrum";
-  weights: {
-    plan_flow: number;
-    busy_relaxed: number;
-    comfort_discomfort: number;
-    immerse_observe: number;
-  };
-};
+import type { SwipeCard } from "./types";
 
 export const swipeCards: SwipeCard[] = [
   {

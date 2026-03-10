@@ -1,33 +1,6 @@
-import type { SwipeCard } from "./cards";
-
-type SwipeResponse = "left" | "right" | "super_like";
-
-interface CardResponse {
-  cardId: number;
-  response: SwipeResponse;
-}
-
-export interface DimensionScores {
-  plan_flow_score: number;
-  busy_relaxed_score: number;
-  comfort_discomfort_score: number;
-  immerse_observe_score: number;
-  confidence: {
-    plan_flow: number;
-    busy_relaxed: number;
-    comfort_discomfort: number;
-    immerse_observe: number;
-  };
-}
-
-const DIMENSIONS = [
-  "plan_flow",
-  "busy_relaxed",
-  "comfort_discomfort",
-  "immerse_observe",
-] as const;
-
-type Dimension = (typeof DIMENSIONS)[number];
+import type { CardResponse, SwipeCard, DimensionScores, TravelerType } from "./types";
+import { DIMENSION_KEYS, type DimensionKey } from "../constants/dimensions";
+import { TRAVELER_TYPES } from "../constants/types";
 
 function computeConfidence(contributingCards: number): number {
   if (contributingCards >= 6) return 80 + Math.min((contributingCards - 6) * 5, 20);
@@ -44,21 +17,21 @@ export function calculateDimensionScores(
 ): DimensionScores {
   const cardMap = new Map(cards.map((c) => [c.id, c]));
 
-  const rawTotals: Record<Dimension, number> = {
+  const rawTotals: Record<DimensionKey, number> = {
     plan_flow: 0,
     busy_relaxed: 0,
     comfort_discomfort: 0,
     immerse_observe: 0,
   };
 
-  const maxPossible: Record<Dimension, number> = {
+  const maxPossible: Record<DimensionKey, number> = {
     plan_flow: 0,
     busy_relaxed: 0,
     comfort_discomfort: 0,
     immerse_observe: 0,
   };
 
-  const contributingCards: Record<Dimension, number> = {
+  const contributingCards: Record<DimensionKey, number> = {
     plan_flow: 0,
     busy_relaxed: 0,
     comfort_discomfort: 0,
@@ -69,15 +42,13 @@ export function calculateDimensionScores(
     const card = cardMap.get(cardId);
     if (!card) continue;
 
-    for (const dim of DIMENSIONS) {
+    for (const dim of DIMENSION_KEYS) {
       const weight = card.weights[dim];
       if (weight === 0) continue;
 
       contributingCards[dim]++;
       const absWeight = Math.abs(weight);
 
-      // Track the maximum possible swing for normalization
-      // Super like gives 2x, so max contribution per card is absWeight * 2
       maxPossible[dim] += absWeight * 2;
 
       if (response === "right") {
@@ -85,16 +56,14 @@ export function calculateDimensionScores(
       } else if (response === "super_like") {
         rawTotals[dim] += weight * 2;
       } else {
-        // Left swipe: inverse at 0.3x
         rawTotals[dim] += -weight * 0.3;
       }
     }
   }
 
-  function normalize(dim: Dimension): number {
+  function normalize(dim: DimensionKey): number {
     const max = maxPossible[dim];
     if (max === 0) return 50;
-    // Raw is in range [-max, +max], normalize to [0, 100]
     const normalized = ((rawTotals[dim] + max) / (2 * max)) * 100;
     return Math.round(Math.min(100, Math.max(0, normalized)));
   }
@@ -113,39 +82,21 @@ export function calculateDimensionScores(
   };
 }
 
-const TYPE_NAMES: Record<string, string> = {
-  PBCI: "The Director",
-  PBCO: "The Collector",
-  PBDI: "The Operator",
-  PBDO: "The Documentarian",
-  PRCI: "The Artisan",
-  PRCO: "The Connoisseur",
-  PRDI: "The Apprentice",
-  PRDO: "The Pilgrim",
-  FBCI: "The Spark",
-  FBCO: "The Flaneur",
-  FBDI: "The Adventurer",
-  FBDO: "The Drifter",
-  FRCI: "The Romantic",
-  FRCO: "The Dreamer",
-  FRDI: "The Nomad",
-  FRDO: "The Ghost",
-};
-
 export function determineTypeCode(scores: {
   plan_flow_score: number;
   busy_relaxed_score: number;
   comfort_discomfort_score: number;
   immerse_observe_score: number;
-}): { type_code: string; type_name: string } {
+}): TravelerType {
   const code =
     (scores.plan_flow_score < 50 ? "P" : "F") +
     (scores.busy_relaxed_score < 50 ? "B" : "R") +
     (scores.comfort_discomfort_score < 50 ? "C" : "D") +
     (scores.immerse_observe_score < 50 ? "I" : "O");
 
+  const typeInfo = TRAVELER_TYPES[code];
   return {
     type_code: code,
-    type_name: TYPE_NAMES[code] ?? "Unknown",
+    type_name: typeInfo?.name ?? "Unknown",
   };
 }

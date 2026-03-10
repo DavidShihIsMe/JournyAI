@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { signIn, getCurrentUser } from "@/lib/services/auth";
+import { getProfile } from "@/lib/services/profile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,35 +33,22 @@ export default function LoginPage() {
     try {
       const supabase = createClient();
 
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
+      const { error: signInError } = await signIn(supabase, email, password);
       if (signInError) {
         setError(signInError.message);
         setLoading(false);
         return;
       }
 
-      // Check if user has completed onboarding via their profile
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
+      const { user } = await getCurrentUser(supabase);
       if (!user) {
         setError("Something went wrong. Please try again.");
         setLoading(false);
         return;
       }
 
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("display_name")
-        .eq("id", user.id)
-        .single();
+      const { data: profile, error: profileError } = await getProfile(supabase, user.id);
 
-      // If profile query fails (table missing, RLS, etc.) or no display_name, go to onboarding
       if (profileError || !profile || !profile.display_name) {
         router.push("/onboarding");
       } else {

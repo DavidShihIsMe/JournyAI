@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { signUp } from "@/lib/services/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,29 +44,12 @@ export default function SignupPage() {
 
     try {
       const supabase = createClient();
-
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            display_name: displayName,
-          },
-        },
-      });
+      const { error: signUpError } = await signUp(supabase, email, password, displayName);
 
       if (signUpError) {
         setError(signUpError.message);
         setLoading(false);
         return;
-      }
-
-      // Update the profile's display_name (the trigger already created the row)
-      if (data.user) {
-        await supabase
-          .from("profiles")
-          .update({ display_name: displayName })
-          .eq("id", data.user.id);
       }
 
       router.push("/onboarding");

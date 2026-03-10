@@ -1,9 +1,7 @@
 "use client";
 
 import { motion, useMotionValue, useTransform, type PanInfo } from "framer-motion";
-import type { SwipeCard as SwipeCardType } from "@/lib/onboarding/cards";
-
-type SwipeResponse = "left" | "right" | "super_like";
+import type { SwipeCard as SwipeCardType, SwipeResponse } from "@/lib/onboarding/types";
 
 interface SwipeCardProps {
   card: SwipeCardType;
@@ -40,9 +38,7 @@ export default function SwipeCard({ card, onSwipe, active }: SwipeCardProps) {
         transition: { duration: 0.2 },
       }}
     >
-      {/* Card background */}
       <div className="relative h-full w-full overflow-hidden rounded-2xl bg-neutral-300">
-        {/* Placeholder for card image */}
         <div
           className="absolute inset-0 bg-neutral-400"
           style={{
@@ -52,26 +48,22 @@ export default function SwipeCard({ card, onSwipe, active }: SwipeCardProps) {
           }}
         />
 
-        {/* Green overlay (swipe right) */}
         <motion.div
           className="pointer-events-none absolute inset-0 rounded-2xl bg-green-500"
           style={{ opacity: greenOpacity }}
         />
 
-        {/* Red overlay (swipe left) */}
         <motion.div
           className="pointer-events-none absolute inset-0 rounded-2xl bg-red-500"
           style={{ opacity: redOpacity }}
         />
 
-        {/* Caption at bottom */}
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-6 pb-24 pt-20">
           <p className="text-lg font-medium leading-snug text-white">
             {card.caption}
           </p>
         </div>
 
-        {/* Super-like button */}
         {active && (
           <div className="absolute inset-x-0 bottom-6 flex justify-center">
             <button
