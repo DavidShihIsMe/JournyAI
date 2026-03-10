@@ -13,4 +13,3 @@ export type {
 
 export type { DimensionKey, DimensionInfo } from "@/lib/constants/dimensions";
 export type { TravelerTypeInfo } from "@/lib/constants/types";
-export type { Interest } from "@/lib/constants/interests";
