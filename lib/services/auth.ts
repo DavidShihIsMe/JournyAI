@@ -35,6 +35,19 @@ export async function signIn(
   return { error };
 }
 
+export async function signInWithGoogle(
+  supabase: SupabaseClient,
+  redirectTo: string
+) {
+  // Google OAuth requires Google Client ID and Secret configured in Supabase Dashboard:
+  // Authentication → Providers → Google → enable and paste credentials.
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: { redirectTo },
+  });
+  return { url: data?.url ?? null, error };
+}
+
 export async function signOut(supabase: SupabaseClient) {
   const { error } = await supabase.auth.signOut();
   return { error };
@@ -46,4 +59,21 @@ export async function getCurrentUser(supabase: SupabaseClient) {
     error,
   } = await supabase.auth.getUser();
   return { user, error };
+}
+
+export async function resetPassword(supabase: SupabaseClient, email: string, redirectTo: string) {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo,
+  });
+  return { error };
+}
+
+export async function updatePassword(supabase: SupabaseClient, newPassword: string) {
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  return { error };
+}
+
+export async function resendVerification(supabase: SupabaseClient, email: string) {
+  const { error } = await supabase.auth.resend({ type: "signup", email });
+  return { error };
 }
