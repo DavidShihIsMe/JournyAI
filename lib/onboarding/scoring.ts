@@ -11,6 +11,12 @@ function computeConfidence(contributingCards: number): number {
   return 0;
 }
 
+// Inverse weight applied when a user left-swipes a card.
+// Relaxed has only 2 direct cards (5, 10) vs 3-4 for all other poles.
+// Higher inverse weight on busy_relaxed compensates for this signal gap.
+const DEFAULT_INVERSE_WEIGHT = 0.3;
+const RELAXED_INVERSE_WEIGHT = 0.5;
+
 export function calculateDimensionScores(
   responses: CardResponse[],
   cards: SwipeCard[]
@@ -56,7 +62,9 @@ export function calculateDimensionScores(
       } else if (response === "super_like") {
         rawTotals[dim] += weight * 2;
       } else {
-        rawTotals[dim] += -weight * 0.3;
+        const inverseWeight =
+          dim === "busy_relaxed" ? RELAXED_INVERSE_WEIGHT : DEFAULT_INVERSE_WEIGHT;
+        rawTotals[dim] += -weight * inverseWeight;
       }
     }
   }
