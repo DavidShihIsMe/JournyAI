@@ -1,0 +1,151 @@
+import type { SwipeCard } from "./cards";
+
+type SwipeResponse = "left" | "right" | "super_like";
+
+interface CardResponse {
+  cardId: number;
+  response: SwipeResponse;
+}
+
+export interface DimensionScores {
+  plan_flow_score: number;
+  busy_relaxed_score: number;
+  comfort_discomfort_score: number;
+  immerse_observe_score: number;
+  confidence: {
+    plan_flow: number;
+    busy_relaxed: number;
+    comfort_discomfort: number;
+    immerse_observe: number;
+  };
+}
+
+const DIMENSIONS = [
+  "plan_flow",
+  "busy_relaxed",
+  "comfort_discomfort",
+  "immerse_observe",
+] as const;
+
+type Dimension = (typeof DIMENSIONS)[number];
+
+function computeConfidence(contributingCards: number): number {
+  if (contributingCards >= 6) return 80 + Math.min((contributingCards - 6) * 5, 20);
+  if (contributingCards >= 4) return 55 + (contributingCards - 4) * 10;
+  if (contributingCards === 3) return 45;
+  if (contributingCards === 2) return 30;
+  if (contributingCards === 1) return 15;
+  return 0;
+}
+
+export function calculateDimensionScores(
+  responses: CardResponse[],
+  cards: SwipeCard[]
+): DimensionScores {
+  const cardMap = new Map(cards.map((c) => [c.id, c]));
+
+  const rawTotals: Record<Dimension, number> = {
+    plan_flow: 0,
+    busy_relaxed: 0,
+    comfort_discomfort: 0,
+    immerse_observe: 0,
+  };
+
+  const maxPossible: Record<Dimension, number> = {
+    plan_flow: 0,
+    busy_relaxed: 0,
+    comfort_discomfort: 0,
+    immerse_observe: 0,
+  };
+
+  const contributingCards: Record<Dimension, number> = {
+    plan_flow: 0,
+    busy_relaxed: 0,
+    comfort_discomfort: 0,
+    immerse_observe: 0,
+  };
+
+  for (const { cardId, response } of responses) {
+    const card = cardMap.get(cardId);
+    if (!card) continue;
+
+    for (const dim of DIMENSIONS) {
+      const weight = card.weights[dim];
+      if (weight === 0) continue;
+
+      contributingCards[dim]++;
+      const absWeight = Math.abs(weight);
+
+      // Track the maximum possible swing for normalization
+      // Super like gives 2x, so max contribution per card is absWeight * 2
+      maxPossible[dim] += absWeight * 2;
+
+      if (response === "right") {
+        rawTotals[dim] += weight;
+      } else if (response === "super_like") {
+        rawTotals[dim] += weight * 2;
+      } else {
+        // Left swipe: inverse at 0.3x
+        rawTotals[dim] += -weight * 0.3;
+      }
+    }
+  }
+
+  function normalize(dim: Dimension): number {
+    const max = maxPossible[dim];
+    if (max === 0) return 50;
+    // Raw is in range [-max, +max], normalize to [0, 100]
+    const normalized = ((rawTotals[dim] + max) / (2 * max)) * 100;
+    return Math.round(Math.min(100, Math.max(0, normalized)));
+  }
+
+  return {
+    plan_flow_score: normalize("plan_flow"),
+    busy_relaxed_score: normalize("busy_relaxed"),
+    comfort_discomfort_score: normalize("comfort_discomfort"),
+    immerse_observe_score: normalize("immerse_observe"),
+    confidence: {
+      plan_flow: computeConfidence(contributingCards.plan_flow),
+      busy_relaxed: computeConfidence(contributingCards.busy_relaxed),
+      comfort_discomfort: computeConfidence(contributingCards.comfort_discomfort),
+      immerse_observe: computeConfidence(contributingCards.immerse_observe),
+    },
+  };
+}
+
+const TYPE_NAMES: Record<string, string> = {
+  PBCI: "The Director",
+  PBCO: "The Collector",
+  PBDI: "The Operator",
+  PBDO: "The Documentarian",
+  PRCI: "The Artisan",
+  PRCO: "The Connoisseur",
+  PRDI: "The Apprentice",
+  PRDO: "The Pilgrim",
+  FBCI: "The Spark",
+  FBCO: "The Flaneur",
+  FBDI: "The Adventurer",
+  FBDO: "The Drifter",
+  FRCI: "The Romantic",
+  FRCO: "The Dreamer",
+  FRDI: "The Nomad",
+  FRDO: "The Ghost",
+};
+
+export function determineTypeCode(scores: {
+  plan_flow_score: number;
+  busy_relaxed_score: number;
+  comfort_discomfort_score: number;
+  immerse_observe_score: number;
+}): { type_code: string; type_name: string } {
+  const code =
+    (scores.plan_flow_score < 50 ? "P" : "F") +
+    (scores.busy_relaxed_score < 50 ? "B" : "R") +
+    (scores.comfort_discomfort_score < 50 ? "C" : "D") +
+    (scores.immerse_observe_score < 50 ? "I" : "O");
+
+  return {
+    type_code: code,
+    type_name: TYPE_NAMES[code] ?? "Unknown",
+  };
+}
