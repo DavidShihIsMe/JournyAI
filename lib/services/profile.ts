@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Profile, TravelerProfile } from "../onboarding/types";
+import { determineTypeCode } from "../onboarding/scoring";
 
 export async function getProfile(supabase: SupabaseClient, userId: string) {
   const { data, error } = await supabase
@@ -32,6 +33,31 @@ export async function getTravelerProfile(
     .from("traveler_profiles")
     .select("*")
     .eq("user_id", userId)
+    .single();
+  return { data: data as TravelerProfile | null, error };
+}
+
+export async function updateDimensionScores(
+  supabase: SupabaseClient,
+  userId: string,
+  scores: {
+    plan_flow_score: number;
+    busy_relaxed_score: number;
+    comfort_discomfort_score: number;
+    immerse_observe_score: number;
+  }
+) {
+  const { type_code, type_name } = determineTypeCode(scores);
+
+  const { data, error } = await supabase
+    .from("traveler_profiles")
+    .update({
+      ...scores,
+      type_code,
+      type_name,
+    })
+    .eq("user_id", userId)
+    .select()
     .single();
   return { data: data as TravelerProfile | null, error };
 }
