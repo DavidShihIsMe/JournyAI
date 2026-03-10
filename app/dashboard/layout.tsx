@@ -46,7 +46,7 @@ export default function DashboardLayout({
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
           {/* Left — brand */}
           <Link href="/dashboard" className="text-lg font-bold">
-            WanderPlan
+            Itinerary.AI
           </Link>
 
           {/* Center — nav links */}

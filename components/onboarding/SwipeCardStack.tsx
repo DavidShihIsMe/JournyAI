@@ -8,9 +8,10 @@ import SwipeCard from "./SwipeCard";
 interface SwipeCardStackProps {
   cards: SwipeCardType[];
   onComplete: (responses: CardResponse[]) => void;
+  onSwipe?: (cardId: number, direction: SwipeResponse, cardNumber: number) => void;
 }
 
-export default function SwipeCardStack({ cards, onComplete }: SwipeCardStackProps) {
+export default function SwipeCardStack({ cards, onComplete, onSwipe }: SwipeCardStackProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [responses, setResponses] = useState<CardResponse[]>([]);
 
@@ -20,6 +21,8 @@ export default function SwipeCardStack({ cards, onComplete }: SwipeCardStackProp
       const newResponses = [...responses, { cardId: card.id, response }];
       setResponses(newResponses);
 
+      onSwipe?.(card.id, response, currentIndex + 1);
+
       const nextIndex = currentIndex + 1;
       if (nextIndex >= cards.length) {
         onComplete(newResponses);
@@ -27,7 +30,7 @@ export default function SwipeCardStack({ cards, onComplete }: SwipeCardStackProp
         setCurrentIndex(nextIndex);
       }
     },
-    [currentIndex, responses, cards, onComplete]
+    [currentIndex, responses, cards, onComplete, onSwipe]
   );
 
   return (

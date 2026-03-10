@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { getCurrentUser } from "@/lib/services/auth";
+import { useOnboardingAnalytics } from "@/hooks/useOnboardingAnalytics";
 import { saveSwipeResponses } from "@/lib/services/swipe";
 import { upsertTravelerProfile } from "@/lib/services/profile";
 import { saveInterests } from "@/lib/services/interests";
@@ -28,6 +29,9 @@ export default function OnboardingPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  const analytics = useOnboardingAnalytics(userId);
+  const analyticsStarted = useRef(false);
+
   // Persist swipe scores across stages
   const [swipeScores, setSwipeScores] = useState<DimensionScores | null>(null);
 
@@ -51,6 +55,25 @@ export default function OnboardingPage() {
       }
     });
   }, [router]);
+
+  // Log onboarding_started once userId is available
+  useEffect(() => {
+    if (userId && !analyticsStarted.current) {
+      analyticsStarted.current = true;
+      analytics.logOnboardingStarted();
+    }
+  }, [userId, analytics]);
+
+  // Best-effort abandoned tracking on page unload
+  useEffect(() => {
+    const handler = () => {
+      if (stage !== "reveal") {
+        analytics.logAbandoned(stage);
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [stage, analytics]);
 
   const handleSwipeComplete = useCallback(
     async (responses: CardResponse[]) => {
@@ -97,14 +120,22 @@ export default function OnboardingPage() {
           return;
         }
 
+        analytics.logSwipeCompleted({
+          plan_flow: scores.plan_flow_score,
+          busy_relaxed: scores.busy_relaxed_score,
+          comfort_discomfort: scores.comfort_discomfort_score,
+          immerse_observe: scores.immerse_observe_score,
+        });
+
         setSaving(false);
         setStage("interests");
+        analytics.logInterestsStarted();
       } catch {
         setError("Something went wrong. Please try again.");
         setSaving(false);
       }
     },
-    [userId]
+    [userId, analytics]
   );
 
   const handleInterestsComplete = useCallback(
@@ -123,19 +154,24 @@ export default function OnboardingPage() {
           return;
         }
 
+        analytics.logInterestsCompleted(selected);
+
         setSaving(false);
         setStage("dream_day");
+        analytics.logDreamDayStarted();
       } catch {
         setError("Something went wrong. Please try again.");
         setSaving(false);
       }
     },
-    [userId]
+    [userId, analytics]
   );
 
   const handleInterestsSkip = useCallback(() => {
+    analytics.logInterestsCompleted([]);
     setStage("dream_day");
-  }, []);
+    analytics.logDreamDayStarted();
+  }, [analytics]);
 
   const handleDreamDayComplete = useCallback(
     async (
@@ -209,6 +245,15 @@ export default function OnboardingPage() {
           return;
         }
 
+        const finalScores = {
+          plan_flow: updatedScores.plan_flow_score,
+          busy_relaxed: updatedScores.busy_relaxed_score,
+          comfort_discomfort: updatedScores.comfort_discomfort_score,
+          immerse_observe: updatedScores.immerse_observe_score,
+        };
+        analytics.logDreamDayCompleted(finalScores);
+        analytics.logOnboardingCompleted(type_code, finalScores);
+
         setRevealData({
           type_code,
           type_name,
@@ -221,7 +266,7 @@ export default function OnboardingPage() {
         setSaving(false);
       }
     },
-    [userId, swipeScores]
+    [userId, swipeScores, analytics]
   );
 
   if (!userId) {
@@ -254,7 +299,11 @@ export default function OnboardingPage() {
   if (stage === "swipe") {
     return (
       <div className="h-screen">
-        <SwipeCardStack cards={swipeCards} onComplete={handleSwipeComplete} />
+        <SwipeCardStack
+          cards={swipeCards}
+          onComplete={handleSwipeComplete}
+          onSwipe={analytics.logSwipe}
+        />
       </div>
     );
   }
@@ -281,6 +330,7 @@ export default function OnboardingPage() {
         }}
         currentConfidence={swipeScores.confidence}
         onComplete={handleDreamDayComplete}
+        onStep={analytics.logDreamDayStep}
       />
     );
   }

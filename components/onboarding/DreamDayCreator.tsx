@@ -29,6 +29,7 @@ interface DreamDayCreatorProps {
       immerse_observe_score: number;
     }
   ) => void;
+  onStep?: (stepNumber: number, dimension: string, choice: string) => void;
 }
 
 type Phase = "intro" | "steps" | "summary";
@@ -37,6 +38,7 @@ export default function DreamDayCreator({
   currentScores,
   currentConfidence,
   onComplete,
+  onStep,
 }: DreamDayCreatorProps) {
   const [phase, setPhase] = useState<Phase>("intro");
   const [stepIndex, setStepIndex] = useState(0);
@@ -67,6 +69,8 @@ export default function DreamDayCreator({
 
     const newResponses = [...responses, response];
     setResponses(newResponses);
+
+    onStep?.(currentStep.step_number, currentStep.dimension, choice);
 
     // Set transition text for next step
     const transition = currentStep.transitions?.[choice] ?? null;

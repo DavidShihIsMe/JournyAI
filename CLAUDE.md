@@ -1,4 +1,4 @@
-# WanderPlan Architecture Rules
+# Itinerary.AI Architecture Rules
 
 ## Separation of Concerns
 
