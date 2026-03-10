@@ -7,12 +7,15 @@ import { getCurrentUser } from "@/lib/services/auth";
 import { saveSwipeResponses } from "@/lib/services/swipe";
 import { upsertTravelerProfile } from "@/lib/services/profile";
 import { saveInterests } from "@/lib/services/interests";
+import { saveDreamDayResponses } from "@/lib/services/dreamDay";
 import { swipeCards } from "@/lib/onboarding/cards";
 import { INTERESTS, POPULAR_INTERESTS } from "@/lib/constants/interests";
 import { calculateDimensionScores, determineTypeCode } from "@/lib/onboarding/scoring";
-import type { CardResponse } from "@/lib/onboarding/types";
+import type { CardResponse, DimensionScores, DreamDayResponse } from "@/lib/onboarding/types";
+import type { DimensionKey } from "@/lib/constants/dimensions";
 import SwipeCardStack from "@/components/onboarding/SwipeCardStack";
 import InterestPicker from "@/components/onboarding/InterestPicker";
+import DreamDayCreator from "@/components/onboarding/DreamDayCreator";
 import { Button } from "@/components/ui/button";
 
 type Stage = "swipe" | "interests" | "dream_day" | "reveal";
@@ -23,6 +26,19 @@ export default function OnboardingPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  // Persist swipe scores across stages
+  const [swipeScores, setSwipeScores] = useState<DimensionScores | null>(null);
+
+  // Final type reveal data
+  const [revealData, setRevealData] = useState<{
+    type_code: string;
+    type_name: string;
+    plan_flow_score: number;
+    busy_relaxed_score: number;
+    comfort_discomfort_score: number;
+    immerse_observe_score: number;
+  } | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -45,6 +61,8 @@ export default function OnboardingPage() {
         const supabase = createClient();
 
         const scores = calculateDimensionScores(responses, swipeCards);
+        setSwipeScores(scores);
+
         const { type_code, type_name } = determineTypeCode(scores);
         const overallConfidence = Math.round(
           (scores.confidence.plan_flow +
@@ -118,6 +136,93 @@ export default function OnboardingPage() {
     setStage("dream_day");
   }, []);
 
+  const handleDreamDayComplete = useCallback(
+    async (
+      responses: DreamDayResponse[],
+      updatedScores: {
+        plan_flow_score: number;
+        busy_relaxed_score: number;
+        comfort_discomfort_score: number;
+        immerse_observe_score: number;
+      }
+    ) => {
+      if (!userId) return;
+      setSaving(true);
+      setError("");
+
+      try {
+        const supabase = createClient();
+
+        // Save dream day responses
+        const { error: dreamError } = await saveDreamDayResponses(
+          supabase,
+          userId,
+          responses
+        );
+
+        if (dreamError) {
+          setError("Failed to save responses. " + dreamError.message);
+          setSaving(false);
+          return;
+        }
+
+        // Calculate final type
+        const { type_code, type_name } = determineTypeCode(updatedScores);
+
+        // Calculate updated confidence (swipe confidence + dream day boost)
+        const baseConfidence = swipeScores?.confidence ?? {
+          plan_flow: 50,
+          busy_relaxed: 50,
+          comfort_discomfort: 50,
+          immerse_observe: 50,
+        };
+        const updatedConfidence = { ...baseConfidence };
+        for (const r of responses) {
+          const dim = r.dimension as DimensionKey;
+          updatedConfidence[dim] = Math.min(100, updatedConfidence[dim] + 10);
+        }
+        const overallConfidence = Math.round(
+          (updatedConfidence.plan_flow +
+            updatedConfidence.busy_relaxed +
+            updatedConfidence.comfort_discomfort +
+            updatedConfidence.immerse_observe) /
+            4
+        );
+
+        // Update traveler profile with final scores
+        const { error: profileError } = await upsertTravelerProfile(supabase, {
+          user_id: userId,
+          plan_flow_score: updatedScores.plan_flow_score,
+          busy_relaxed_score: updatedScores.busy_relaxed_score,
+          comfort_discomfort_score: updatedScores.comfort_discomfort_score,
+          immerse_observe_score: updatedScores.immerse_observe_score,
+          type_code,
+          type_name,
+          profile_confidence: overallConfidence,
+          onboarding_completed: true,
+        });
+
+        if (profileError) {
+          setError("Failed to save profile. " + profileError.message);
+          setSaving(false);
+          return;
+        }
+
+        setRevealData({
+          type_code,
+          type_name,
+          ...updatedScores,
+        });
+        setSaving(false);
+        setStage("reveal");
+      } catch {
+        setError("Something went wrong. Please try again.");
+        setSaving(false);
+      }
+    },
+    [userId, swipeScores]
+  );
+
   if (!userId) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -164,19 +269,68 @@ export default function OnboardingPage() {
     );
   }
 
-  if (stage === "dream_day") {
+  if (stage === "dream_day" && swipeScores) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-6 px-4">
+      <DreamDayCreator
+        currentScores={{
+          plan_flow_score: swipeScores.plan_flow_score,
+          busy_relaxed_score: swipeScores.busy_relaxed_score,
+          comfort_discomfort_score: swipeScores.comfort_discomfort_score,
+          immerse_observe_score: swipeScores.immerse_observe_score,
+        }}
+        currentConfidence={swipeScores.confidence}
+        onComplete={handleDreamDayComplete}
+      />
+    );
+  }
+
+  if (stage === "reveal" && revealData) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-8 px-6">
         <div className="text-center">
-          <h2 className="text-2xl font-semibold">Dream Day Creator coming next</h2>
-          <p className="mt-2 text-muted-foreground">
-            Your interests have been saved.
+          <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            You are
+          </p>
+          <h1 className="mt-2 text-4xl font-bold">{revealData.type_name}</h1>
+          <p className="mt-1 font-mono text-lg text-muted-foreground">
+            {revealData.type_code}
           </p>
         </div>
-        <Button onClick={() => router.push("/dashboard")}>Continue</Button>
+        <div className="w-full max-w-xs space-y-3">
+          <ScoreRow label="Plan vs Flow" value={revealData.plan_flow_score} />
+          <ScoreRow label="Busy vs Relaxed" value={revealData.busy_relaxed_score} />
+          <ScoreRow label="Comfort vs Discomfort" value={revealData.comfort_discomfort_score} />
+          <ScoreRow label="Immerse vs Observe" value={revealData.immerse_observe_score} />
+        </div>
+        <Button
+          className="w-full max-w-xs"
+          onClick={() => {
+            router.push("/dashboard");
+            router.refresh();
+          }}
+        >
+          Go to Dashboard
+        </Button>
       </div>
     );
   }
 
   return null;
+}
+
+function ScoreRow({ label, value }: { label: string; value: number }) {
+  return (
+    <div>
+      <div className="mb-1 flex justify-between text-sm">
+        <span>{label}</span>
+        <span className="font-mono text-muted-foreground">{value}</span>
+      </div>
+      <div className="h-2 rounded-full bg-muted">
+        <div
+          className="h-2 rounded-full bg-primary transition-all"
+          style={{ width: `${value}%` }}
+        />
+      </div>
+    </div>
+  );
 }
