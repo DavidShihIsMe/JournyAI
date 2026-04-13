@@ -17,9 +17,21 @@ const lora = Lora({
 });
 
 export const metadata: Metadata = {
-  title: "Journy — Travel like yourself",
+  title: "Journy — Travel like yourself, not like your feed",
   description:
-    "Discover your traveler personality and get recommendations that match how you actually like to explore.",
+    "Discover your traveler personality, find your perfect travel companions, and get itineraries built for who you actually are.",
+  keywords: [
+    "travel",
+    "personality",
+    "trip planning",
+    "travel compatibility",
+    "travel quiz",
+  ],
+  openGraph: {
+    title: "Journy — Travel like yourself",
+    description: "Discover your traveler personality type.",
+    type: "website",
+  },
 };
 
 export default function RootLayout({
