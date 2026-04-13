@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+:root {
+  --color-primary: #1A7D7A;
+  --color-primary-dark: #15635F;
+  --color-primary-light: #E6F5F4;
+  --color-secondary: #E8845C;
+
+  --color-neutral-50: #FAFAFA;
+  --color-neutral-100: #F3F4F6;
+  --color-neutral-200: #E5E7EB;
+  --color-neutral-300: #D1D5DB;
+  --color-neutral-400: #9CA3AF;
+  --color-neutral-600: #4B5563;
+  --color-neutral-800: #1F2937;
+  --color-neutral-900: #111827;
+
+  --color-group-pb: #4A5899;
+  --color-group-pr: #9A5B7A;
+  --color-group-fb: #C4853A;
+  --color-group-fr: #3A8A7A;
+
+  --color-success: #22C55E;
+  --color-error: #EF4444;
+  --color-warning: #F59E0B;
+}
+
+@theme inline {
+  --color-primary: var(--color-primary);
+  --color-primary-dark: var(--color-primary-dark);
+  --color-primary-light: var(--color-primary-light);
+  --color-secondary: var(--color-secondary);
+
+  --color-neutral-50: var(--color-neutral-50);
+  --color-neutral-100: var(--color-neutral-100);
+  --color-neutral-200: var(--color-neutral-200);
+  --color-neutral-300: var(--color-neutral-300);
+  --color-neutral-400: var(--color-neutral-400);
+  --color-neutral-600: var(--color-neutral-600);
+  --color-neutral-800: var(--color-neutral-800);
+  --color-neutral-900: var(--color-neutral-900);
+
+  --color-group-pb: var(--color-group-pb);
+  --color-group-pr: var(--color-group-pr);
+  --color-group-fb: var(--color-group-fb);
+  --color-group-fr: var(--color-group-fr);
+
+  --color-success: var(--color-success);
+  --color-error: var(--color-error);
+  --color-warning: var(--color-warning);
+
+  --font-display: var(--font-playfair-display);
+  --font-body: var(--font-lora);
+}
+
+body {
+  background: #ffffff;
+  color: var(--color-neutral-900);
+  font-family: var(--font-body), Georgia, serif;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}

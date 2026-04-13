@@ -4,7 +4,7 @@ create table public.traveler_profiles (
   user_id uuid references public.profiles(id) on delete cascade unique not null,
   plan_flow_score integer not null default 50,
   busy_relaxed_score integer not null default 50,
-  comfort_discomfort_score integer not null default 50,
+  comfort_discomfort_score integer not null default 50, -- TODO: rename to comfort_adventure_score in a new migration
   immerse_observe_score integer not null default 50,
   type_code text,
   type_name text,

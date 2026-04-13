@@ -29,7 +29,7 @@ export const FIXED_STEPS: DreamDayStep[] = [
   },
   {
     step_number: 2,
-    dimension: "comfort_discomfort",
+    dimension: "comfort_adventure",
     time_of_day: "Getting There",
     prompt: "How do you get there?",
     left_option: "Pre-booked car. Smooth ride. AC on.",
@@ -111,10 +111,10 @@ export const DYNAMIC_OPTIONS: Record<DimensionKey, { evening: DreamDayStep; nigh
       right_option: "Back to the room. Book in hand. Window open.",
     },
   },
-  comfort_discomfort: {
+  comfort_adventure: {
     evening: {
       step_number: 5,
-      dimension: "comfort_discomfort",
+      dimension: "comfort_adventure",
       time_of_day: "Evening",
       prompt: "Time for dinner. Where do you end up?",
       left_option: "The place with the candlelit terrace and the wine list.",
@@ -126,7 +126,7 @@ export const DYNAMIC_OPTIONS: Record<DimensionKey, { evening: DreamDayStep; nigh
     },
     night: {
       step_number: 6,
-      dimension: "comfort_discomfort",
+      dimension: "comfort_adventure",
       time_of_day: "Night",
       prompt: "Last stop of the night.",
       left_option: "The rooftop bar with the skyline view everyone talks about.",
@@ -157,10 +157,10 @@ export const DYNAMIC_OPTIONS: Record<DimensionKey, { evening: DreamDayStep; nigh
   },
 };
 
-// Tie-break priority: immerse_observe > comfort_discomfort > busy_relaxed > plan_flow
+// Tie-break priority: immerse_observe > comfort_adventure > busy_relaxed > plan_flow
 const PRIORITY_ORDER: DimensionKey[] = [
   "immerse_observe",
-  "comfort_discomfort",
+  "comfort_adventure",
   "busy_relaxed",
   "plan_flow",
 ];

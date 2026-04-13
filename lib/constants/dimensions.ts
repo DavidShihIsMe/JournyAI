@@ -1,7 +1,7 @@
 export const DIMENSION_KEYS = [
   "plan_flow",
   "busy_relaxed",
-  "comfort_discomfort",
+  "comfort_adventure",
   "immerse_observe",
 ] as const;
 
@@ -37,12 +37,12 @@ export const DIMENSIONS: DimensionInfo[] = [
     description: "Do you pack your days full or leave room to breathe?",
   },
   {
-    key: "comfort_discomfort",
-    label: "Comfort vs Discomfort",
+    key: "comfort_adventure",
+    label: "Comfort vs Adventure",
     lowPole: "Comfort",
-    highPole: "Discomfort",
+    highPole: "Adventure",
     lowCode: "C",
-    highCode: "D",
+    highCode: "A",
     description: "Do you seek familiar luxury or unfamiliar challenge?",
   },
   {

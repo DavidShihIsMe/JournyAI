@@ -26,21 +26,21 @@ export function calculateDimensionScores(
   const rawTotals: Record<DimensionKey, number> = {
     plan_flow: 0,
     busy_relaxed: 0,
-    comfort_discomfort: 0,
+    comfort_adventure: 0,
     immerse_observe: 0,
   };
 
   const maxPossible: Record<DimensionKey, number> = {
     plan_flow: 0,
     busy_relaxed: 0,
-    comfort_discomfort: 0,
+    comfort_adventure: 0,
     immerse_observe: 0,
   };
 
   const contributingCards: Record<DimensionKey, number> = {
     plan_flow: 0,
     busy_relaxed: 0,
-    comfort_discomfort: 0,
+    comfort_adventure: 0,
     immerse_observe: 0,
   };
 
@@ -79,12 +79,12 @@ export function calculateDimensionScores(
   return {
     plan_flow_score: normalize("plan_flow"),
     busy_relaxed_score: normalize("busy_relaxed"),
-    comfort_discomfort_score: normalize("comfort_discomfort"),
+    comfort_adventure_score: normalize("comfort_adventure"),
     immerse_observe_score: normalize("immerse_observe"),
     confidence: {
       plan_flow: computeConfidence(contributingCards.plan_flow),
       busy_relaxed: computeConfidence(contributingCards.busy_relaxed),
-      comfort_discomfort: computeConfidence(contributingCards.comfort_discomfort),
+      comfort_adventure: computeConfidence(contributingCards.comfort_adventure),
       immerse_observe: computeConfidence(contributingCards.immerse_observe),
     },
   };
@@ -93,13 +93,13 @@ export function calculateDimensionScores(
 export function determineTypeCode(scores: {
   plan_flow_score: number;
   busy_relaxed_score: number;
-  comfort_discomfort_score: number;
+  comfort_adventure_score: number;
   immerse_observe_score: number;
 }): TravelerType {
   const code =
     (scores.plan_flow_score < 50 ? "P" : "F") +
     (scores.busy_relaxed_score < 50 ? "B" : "R") +
-    (scores.comfort_discomfort_score < 50 ? "C" : "D") +
+    (scores.comfort_adventure_score < 50 ? "C" : "A") +
     (scores.immerse_observe_score < 50 ? "I" : "O");
 
   const typeInfo = TRAVELER_TYPES[code];

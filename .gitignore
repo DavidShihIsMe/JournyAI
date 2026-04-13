@@ -1,20 +1,12 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
 # dependencies
-/node_modules
-/.pnp
-.pnp.js
-.yarn/install-state.gz
-
-# testing
-/coverage
+node_modules/
 
 # next.js
-/.next/
-/out/
+.next/
+out/
 
 # production
-/build
+build/
 
 # misc
 .DS_Store
@@ -34,3 +26,24 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# web app
+web/node_modules/
+web/.next/
+web/.env.local
+
+# archived mobile app
+archive/mobile/node_modules/
+archive/mobile/.expo/
+archive/mobile/dist/
+archive/mobile/.env
+
+# archived web-v1
+archive/web-v1/node_modules/
+archive/web-v1/.next/
+
+# mcp config (contains API keys)
+.mcp.json
+
+# claude
+.claude/

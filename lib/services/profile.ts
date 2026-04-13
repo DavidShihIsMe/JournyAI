@@ -43,7 +43,7 @@ export async function updateDimensionScores(
   scores: {
     plan_flow_score: number;
     busy_relaxed_score: number;
-    comfort_discomfort_score: number;
+    comfort_adventure_score: number;
     immerse_observe_score: number;
   }
 ) {
@@ -68,7 +68,7 @@ export async function upsertTravelerProfile(
     user_id: string;
     plan_flow_score: number;
     busy_relaxed_score: number;
-    comfort_discomfort_score: number;
+    comfort_adventure_score: number;
     immerse_observe_score: number;
     type_code: string;
     type_name: string;

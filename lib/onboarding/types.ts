@@ -16,19 +16,19 @@ export interface SwipeCard {
 export interface DimensionWeights {
   plan_flow: number;
   busy_relaxed: number;
-  comfort_discomfort: number;
+  comfort_adventure: number;
   immerse_observe: number;
 }
 
 export interface DimensionScores {
   plan_flow_score: number;
   busy_relaxed_score: number;
-  comfort_discomfort_score: number;
+  comfort_adventure_score: number;
   immerse_observe_score: number;
   confidence: {
     plan_flow: number;
     busy_relaxed: number;
-    comfort_discomfort: number;
+    comfort_adventure: number;
     immerse_observe: number;
   };
 }
@@ -43,7 +43,7 @@ export interface TravelerProfile {
   user_id: string;
   plan_flow_score: number;
   busy_relaxed_score: number;
-  comfort_discomfort_score: number;
+  comfort_adventure_score: number;
   immerse_observe_score: number;
   type_code: string | null;
   type_name: string | null;

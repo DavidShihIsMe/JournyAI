@@ -21,7 +21,7 @@ function printScores(label: string, responses: CardResponse[]) {
   console.log(`\n=== ${label} ===`);
   console.log(`  plan_flow:          ${scores.plan_flow_score}`);
   console.log(`  busy_relaxed:       ${scores.busy_relaxed_score}`);
-  console.log(`  comfort_discomfort:  ${scores.comfort_discomfort_score}`);
+  console.log(`  comfort_adventure:  ${scores.comfort_adventure_score}`);
   console.log(`  immerse_observe:    ${scores.immerse_observe_score}`);
 }
 
