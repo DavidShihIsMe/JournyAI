@@ -8,45 +8,44 @@ export default function LandingPage() {
       <NavBar />
 
       <main>
-        <section className="relative h-screen w-full bg-primary flex flex-col items-center justify-center px-5 text-center">
-          <h1 className="font-display font-black text-[56px] md:text-[96px] text-white leading-none">
-            Journy
-          </h1>
-          <p className="font-body font-normal text-[18px] md:text-[24px] text-white/70 mt-5">
-            Discover your travel style.
-          </p>
-          <p className="font-body font-normal text-[14px] md:text-[16px] text-white/50 mt-3 max-w-[500px]">
-            Take a 2-minute quiz, discover your traveler personality, and get
-            personalized trip recommendations.
-          </p>
-          <p className="font-body font-normal text-[12px] md:text-[14px] text-white/40 mt-2">
-            Personalized itinerary generation coming soon.
-          </p>
-          <Link
-            href="/quiz"
-            className="mt-12 font-body font-semibold text-[16px] md:text-[18px] text-primary bg-white px-10 py-4 rounded-[30px] shadow-[0_4px_12px_rgba(0,0,0,0.1)] transition-transform duration-200 hover:scale-[1.03]"
-          >
-            Find Your Travel Style
-          </Link>
+        <section className="relative w-full bg-primary min-h-screen md:h-[900px] overflow-hidden">
+          <div className="max-w-[1440px] mx-auto px-5 md:px-20 pt-[160px] md:pt-[298px]">
+            <h1 className="font-display font-normal text-[64px] md:text-[96px] leading-none text-white">
+              Journy
+            </h1>
+
+            <p className="font-body font-bold text-[20px] md:text-[24px] leading-[1.208] text-white/70 mt-10 md:mt-[79px]">
+              Discover your travel style
+            </p>
+
+            <p className="font-body font-bold text-[18px] md:text-[20px] leading-[1.45] text-white/70 mt-5 md:mt-[20px] max-w-[667px]">
+              Take a 2-minute quiz and find out what kind of traveler you
+              really are.
+            </p>
+
+            <Link
+              href="/quiz"
+              className="inline-block font-body font-semibold text-[18px] leading-[1.611] text-white mt-8 md:mt-[33px]"
+            >
+              Find Your Travel Style →
+            </Link>
+          </div>
 
           <ScrollIndicator />
         </section>
 
+        <div
+          className="h-[100px] w-full"
+          style={{
+            background: "linear-gradient(to bottom, #1A7D7A 0%, #FFFFFF 100%)",
+          }}
+        />
+
         <section id="below" className="bg-white">
-          <div
-            className="h-[100px] w-full"
-            style={{
-              background:
-                "linear-gradient(to bottom, #1A7D7A 0%, #FFFFFF 100%)",
-            }}
-          />
-          <div className="min-h-[400px] flex flex-col items-center justify-center px-5 py-20">
-            <h2 className="font-display font-black text-[40px] md:text-[64px] text-neutral-900 text-center leading-none">
+          <div className="min-h-[400px] flex items-center justify-center pt-[100px] pb-[100px] px-5">
+            <h2 className="font-display font-normal text-[56px] md:text-[96px] leading-none text-black text-center">
               Coming Soon!
             </h2>
-            <p className="font-body font-normal text-[18px] text-neutral-400 text-center mt-6">
-              We&apos;re building something special. Stay tuned.
-            </p>
           </div>
         </section>
       </main>
