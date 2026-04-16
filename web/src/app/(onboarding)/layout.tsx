@@ -17,7 +17,12 @@ export default function OnboardingLayout({
 }) {
   const pathname = usePathname();
   const progress = PROGRESS_MAP[pathname] ?? 0;
-  const showProgress = pathname !== "/type-reveal";
+  const showProgress = pathname !== "/type-reveal" && pathname !== "/quiz";
+  const showHeader = pathname !== "/quiz";
+
+  if (!showHeader) {
+    return <div className="min-h-full bg-white">{children}</div>;
+  }
 
   return (
     <div className="min-h-full flex flex-col bg-white">

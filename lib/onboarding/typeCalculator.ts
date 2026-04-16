@@ -1,4 +1,9 @@
 import { TYPE_NAMES, GROUP_COLORS } from "../constants/travelerTypes";
+import {
+  computeDimensionScores,
+  type DimensionScores,
+  type QuizResponse,
+} from "./quizQuestions";
 
 export interface DimensionScoreInput {
   plan_flow: number;
@@ -79,4 +84,33 @@ export function calculateTravelerType(
 export function scoreToSliderPosition(score: number): number {
   const position = ((score + MAX_SCORE) / (2 * MAX_SCORE)) * 100;
   return Math.min(100, Math.max(0, Math.round(position)));
+}
+
+const QUIZ_MAX_SCORE = 12;
+
+export function travelerTypeFromDimensionScores(scores: DimensionScores): TypeResult {
+  let code = "";
+  const dimensions = {} as TypeResult["dimensions"];
+
+  for (const dim of DIMENSION_CONFIG) {
+    const score = scores[dim.key];
+    const isRight = score > 0;
+    const pole = isRight ? dim.rightLetter : dim.leftLetter;
+    const label = isRight ? dim.rightLabel : dim.leftLabel;
+    const confidence = Math.min(100, Math.round((Math.abs(score) / QUIZ_MAX_SCORE) * 100));
+
+    code += pole;
+    dimensions[dim.key] = { score, pole, label, confidence };
+  }
+
+  const name = TYPE_NAMES[code] || "Unknown Type";
+  const group = code.substring(0, 2);
+  const groupColor = GROUP_COLORS[group] || "#1A7D7A";
+
+  return { code, name, groupColor, dimensions };
+}
+
+export function travelerTypeFromQuiz(responses: QuizResponse[]): TypeResult {
+  const scores = computeDimensionScores(responses);
+  return travelerTypeFromDimensionScores(scores);
 }
