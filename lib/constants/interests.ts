@@ -1,3 +1,111 @@
+export interface InterestOption {
+  id: string;
+  label: string;
+  category: string;
+}
+
+function slug(label: string): string {
+  return label
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+const RAW_INTERESTS: Record<string, string[]> = {
+  "Food & Dining": [
+    "Food & Dining",
+    "Street Food",
+    "Fine Dining",
+    "Coffee & Cafés",
+    "Brunch",
+    "Bakeries",
+    "Cooking Classes",
+    "Food Tours",
+    "Tastings",
+    "Wine & Cocktails",
+    "Breweries",
+    "Local Cuisine",
+    "Markets",
+    "Night Markets",
+  ],
+  "Culture & Arts": [
+    "Museums",
+    "Art Galleries",
+    "History",
+    "Architecture",
+    "Religious Sites",
+    "Temples",
+    "Street Art",
+    "Cultural Sites",
+    "Heritage Tours",
+  ],
+  Entertainment: [
+    "Live Music",
+    "Jazz",
+    "Electronic Music",
+    "Theater",
+    "Comedy Shows",
+    "Festivals",
+    "Concerts",
+    "Sports Events",
+  ],
+  Nightlife: ["Nightlife", "Bars", "Cocktail Bars", "Rooftops", "Dancing", "Clubs"],
+  Shopping: [
+    "Shopping",
+    "Vintage Stores",
+    "Boutiques",
+    "Local Markets",
+    "Bazaars",
+    "Malls",
+  ],
+  "Nature & Outdoors": [
+    "Nature",
+    "Hiking",
+    "Beaches",
+    "Mountains",
+    "Parks",
+    "Gardens",
+    "Scenic Views",
+    "Wildlife",
+    "National Parks",
+  ],
+  "Adventure & Sports": [
+    "Adventure Sports",
+    "Diving",
+    "Surfing",
+    "Water Sports",
+    "Kayaking",
+    "Rock Climbing",
+    "Skiing",
+    "Biking",
+  ],
+  Wellness: ["Yoga & Wellness", "Spas", "Meditation", "Hot Springs", "Thermal Baths"],
+  "Neighborhoods & Exploration": [
+    "Off the Beaten Path",
+    "Hidden Gems",
+    "Local Neighborhoods",
+    "Walking Tours",
+    "Scenic Drives",
+  ],
+  "Photography & Views": [
+    "Photography",
+    "Instagram Spots",
+    "Viewpoints",
+    "Sunsets",
+    "Sunrises",
+  ],
+};
+
+export const INTEREST_OPTIONS: InterestOption[] = Object.entries(RAW_INTERESTS).flatMap(
+  ([category, labels]) =>
+    labels.map((label) => ({
+      id: slug(label),
+      label,
+      category,
+    }))
+);
+
 export const INTERESTS: string[] = [
   // Food & Drink
   "Street food", "Fine dining", "Coffee", "Cooking classes", "Wine", "Craft beer",

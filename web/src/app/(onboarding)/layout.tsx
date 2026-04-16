@@ -17,10 +17,11 @@ export default function OnboardingLayout({
 }) {
   const pathname = usePathname();
   const progress = PROGRESS_MAP[pathname] ?? 0;
-  const showProgress = pathname !== "/type-reveal" && pathname !== "/quiz";
-  const showHeader = pathname !== "/quiz";
+  const fullBleedRoutes = new Set(["/quiz", "/interests"]);
+  const isFullBleed = fullBleedRoutes.has(pathname);
+  const showProgress = pathname !== "/type-reveal" && !isFullBleed;
 
-  if (!showHeader) {
+  if (isFullBleed) {
     return <div className="min-h-full bg-white">{children}</div>;
   }
 
