@@ -72,3 +72,75 @@ html {
 .animate-gentle-bounce {
   animation: gentle-bounce 2s ease-in-out infinite;
 }
+
+/* ---------- Journy retro guidebook landing ---------- */
+.journy-paper-texture::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    radial-gradient(#1B1A1808 1px, transparent 1px),
+    radial-gradient(#1B1A1808 0.5px, transparent 0.5px);
+  background-size: 3px 3px, 7px 7px;
+  background-position: 0 0, 2px 2px;
+  opacity: 0.5;
+  mix-blend-mode: multiply;
+}
+
+.journy-drop-cap::first-letter {
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-variation-settings: "opsz" 144;
+  font-weight: 900;
+  font-size: 3.4em;
+  line-height: 0.9;
+  float: left;
+  padding: 6px 10px 0 0;
+  color: #7A2E2A;
+}
+
+@keyframes journyFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes journyLift {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.journy-root ::selection {
+  background: #7A2E2A;
+  color: #F2EAD6;
+}
+
+.journy-root :focus-visible {
+  outline: 2px solid #7A2E2A;
+  outline-offset: 3px;
+}
+
+@media (max-width: 860px) {
+  .journy-hero-grid,
+  .journy-premise-grid,
+  .journy-notations-header,
+  .journy-archive-spread,
+  .journy-footer-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .journy-archive-left {
+    border-right: none !important;
+    border-bottom: 1px solid #1B1A18;
+  }
+  .journy-notations-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .journy-process-row {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .journy-notations-grid {
+    grid-template-columns: 1fr !important;
+  }
+}

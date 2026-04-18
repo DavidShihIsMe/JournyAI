@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Playfair_Display, Lora } from "next/font/google";
+import { Playfair_Display, Lora, Fraunces, Inter, DM_Mono } from "next/font/google";
 import "./globals.css";
 
 const playfairDisplay = Playfair_Display({
@@ -16,10 +16,32 @@ const lora = Lora({
   display: "swap",
 });
 
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  display: "swap",
+  axes: ["opsz"],
+});
+
+const inter = Inter({
+  variable: "--font-inter",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
+
+const dmMono = DM_Mono({
+  variable: "--font-dm-mono",
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  display: "swap",
+});
+
 export const metadata: Metadata = {
-  title: "Journy — Travel like yourself, not like your feed",
+  title: "Journy — a guidebook, written for one.",
   description:
-    "Discover your traveler personality, find your perfect travel companions, and get itineraries built for who you actually are.",
+    "A pocket guidebook, issued on demand, for travelers who prefer a point of view. Twelve statements. One of sixteen notations.",
   keywords: [
     "travel",
     "personality",
@@ -28,8 +50,8 @@ export const metadata: Metadata = {
     "travel quiz",
   ],
   openGraph: {
-    title: "Journy — Travel like yourself",
-    description: "Discover your traveler personality type.",
+    title: "Journy — a guidebook, written for one.",
+    description: "Twelve statements. A notation. A guidebook.",
     type: "website",
   },
 };
@@ -42,7 +64,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${playfairDisplay.variable} ${lora.variable} h-full`}
+      className={`${playfairDisplay.variable} ${lora.variable} ${fraunces.variable} ${inter.variable} ${dmMono.variable} h-full`}
     >
       <body className="min-h-full flex flex-col antialiased">{children}</body>
     </html>

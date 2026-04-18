@@ -1,54 +1,51 @@
-import Link from "next/link";
-import NavBar from "@/components/NavBar";
-import ScrollIndicator from "@/components/ScrollIndicator";
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Masthead from "@/components/landing/Masthead";
+import Hero from "@/components/landing/Hero";
+import Premise from "@/components/landing/Premise";
+import Notations from "@/components/landing/Notations";
+import Process from "@/components/landing/Process";
+import Archive from "@/components/landing/Archive";
+import { FinalCTA, Footer, SignInModal } from "@/components/landing/Ending";
 
 export default function LandingPage() {
+  const router = useRouter();
+  const [signInOpen, setSignInOpen] = useState(false);
+
+  const handleStart = () => {
+    router.push("/quiz");
+  };
+
+  const handleSample = () => {
+    const el = document.getElementById("archive");
+    if (!el) return;
+    const y = el.getBoundingClientRect().top + window.scrollY - 80;
+    window.scrollTo({ top: y, behavior: "smooth" });
+  };
+
   return (
-    <>
-      <NavBar />
-
-      <main>
-        <section className="relative w-full bg-primary min-h-screen md:h-[900px] overflow-hidden">
-          <div className="max-w-[1440px] mx-auto px-5 md:px-20 pt-[160px] md:pt-[298px]">
-            <h1 className="font-display font-normal text-[64px] md:text-[96px] leading-none text-white">
-              Journy
-            </h1>
-
-            <p className="font-body font-bold text-[20px] md:text-[24px] leading-[1.208] text-white/70 mt-10 md:mt-[79px]">
-              Discover your travel style
-            </p>
-
-            <p className="font-body font-bold text-[18px] md:text-[20px] leading-[1.45] text-white/70 mt-5 md:mt-[20px] max-w-[667px]">
-              Take a 2-minute quiz and find out what kind of traveler you
-              really are.
-            </p>
-
-            <Link
-              href="/quiz"
-              className="inline-block font-body font-semibold text-[18px] leading-[1.611] text-white mt-8 md:mt-[33px]"
-            >
-              Find Your Travel Style →
-            </Link>
-          </div>
-
-          <ScrollIndicator />
-        </section>
-
-        <div
-          className="h-[100px] w-full"
-          style={{
-            background: "linear-gradient(to bottom, #1A7D7A 0%, #FFFFFF 100%)",
-          }}
-        />
-
-        <section id="below" className="bg-white">
-          <div className="min-h-[400px] flex items-center justify-center pt-[100px] pb-[100px] px-5">
-            <h2 className="font-display font-normal text-[56px] md:text-[96px] leading-none text-black text-center">
-              Coming Soon!
-            </h2>
-          </div>
-        </section>
-      </main>
-    </>
+    <div
+      className="journy-root journy-paper-texture"
+      style={{
+        background: "#F2EAD6",
+        color: "#1B1A18",
+        position: "relative",
+        minHeight: "100vh",
+      }}
+    >
+      <div style={{ position: "relative", zIndex: 1 }}>
+        <Masthead onSignIn={() => setSignInOpen(true)} onStart={handleStart} />
+        <Hero onStart={handleStart} onSample={handleSample} />
+        <Premise />
+        <Notations onStart={handleStart} />
+        <Process onStart={handleStart} />
+        <Archive onSample={handleSample} />
+        <FinalCTA onStart={handleStart} onSample={handleSample} />
+        <Footer />
+        <SignInModal open={signInOpen} onClose={() => setSignInOpen(false)} />
+      </div>
+    </div>
   );
 }

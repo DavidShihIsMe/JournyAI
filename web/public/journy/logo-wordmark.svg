@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 120" fill="none">
+  
+  <text x="10" y="80" class="j-word">JOURNY</text>
+  <line x1="10" y1="100" x2="410" y2="100" stroke="#1B1A18" stroke-width="1"></line>
+  <text x="10" y="115" class="j-sub">Est. MMXXV</text>
+  <text x="410" y="115" text-anchor="end" class="j-sub">Vol. I · No. 1</text>
+</svg>
