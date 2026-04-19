@@ -63,18 +63,8 @@ export default function InterestsPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    try {
-      const rawSel = window.localStorage.getItem(SELECTED_KEY);
-      if (rawSel) setSelected(new Set(JSON.parse(rawSel) as string[]));
-    } catch {
-      // ignore
-    }
-    try {
-      const rawCustom = window.localStorage.getItem(CUSTOM_KEY);
-      if (rawCustom) setCustom(JSON.parse(rawCustom) as InterestOption[]);
-    } catch {
-      // ignore
-    }
+    window.localStorage.removeItem(SELECTED_KEY);
+    window.localStorage.removeItem(CUSTOM_KEY);
   }, []);
 
   useEffect(() => {
