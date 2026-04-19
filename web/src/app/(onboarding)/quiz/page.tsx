@@ -1,48 +1,37 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   QUIZ_QUESTIONS,
+  QUIZ_CHAPTERS,
   computeDimensionScores,
   type QuizResponse,
 } from "@lib/onboarding/quizQuestions";
-import ProgressBar from "@/components/ProgressBar";
+import QuizMasthead from "@/components/quiz/QuizMasthead";
+import AgreeScale from "@/components/quiz/AgreeScale";
+import {
+  INK,
+  INK2,
+  INK3,
+  INK4,
+  MONO,
+  OXBLOOD,
+  PAPER,
+  PAPER2,
+  SANS,
+  SERIF,
+} from "@/components/landing/brand";
 
-const ADVANCE_DELAY_MS = 400;
-const TRANSITION_MS = 250;
 const RESPONSES_KEY = "journy_quiz_responses";
 const SCORES_KEY = "journy_dimension_scores";
-
-const SCALE_VALUES = [1, 2, 3, 4, 5, 6, 7] as const;
 
 export default function QuizPage() {
   const router = useRouter();
   const total = QUIZ_QUESTIONS.length;
-  const [index, setIndex] = useState(0);
-  const [responses, setResponses] = useState<Map<number, number>>(new Map());
-  const [transitioning, setTransitioning] = useState(false);
-  const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const question = QUIZ_QUESTIONS[index];
-  const currentValue = responses.get(question.id) ?? null;
-  const isFirst = index === 0;
-  const isLast = index === total - 1;
-  const progress = Math.round(((index + (currentValue ? 1 : 0)) / total) * 100);
-
-  const persistResponses = useCallback((map: Map<number, number>) => {
-    if (typeof window === "undefined") return;
-    const arr: QuizResponse[] = [];
-    for (const q of QUIZ_QUESTIONS) {
-      const value = map.get(q.id);
-      if (value !== undefined) {
-        arr.push({ questionId: q.id, dataKey: q.dataKey, value });
-      }
-    }
-    window.localStorage.setItem(RESPONSES_KEY, JSON.stringify(arr));
-    const scores = computeDimensionScores(arr);
-    window.localStorage.setItem(SCORES_KEY, JSON.stringify(scores));
-  }, []);
+  const [answers, setAnswers] = useState<(number | null)[]>(() =>
+    Array(total).fill(null)
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -50,157 +39,313 @@ export default function QuizPage() {
     if (!raw) return;
     try {
       const parsed: QuizResponse[] = JSON.parse(raw);
-      const map = new Map<number, number>();
-      for (const r of parsed) map.set(r.questionId, r.value);
-      setResponses(map);
+      const next = Array(total).fill(null) as (number | null)[];
+      const byId = new Map(QUIZ_QUESTIONS.map((q, i) => [q.id, i]));
+      for (const r of parsed) {
+        const idx = byId.get(r.questionId);
+        if (idx !== undefined) next[idx] = r.value;
+      }
+      setAnswers(next);
     } catch {
-      // ignore corrupted storage
+      // ignore
     }
-  }, []);
+  }, [total]);
 
-  useEffect(() => {
-    return () => {
-      if (advanceTimer.current) clearTimeout(advanceTimer.current);
-    };
-  }, []);
-
-  const goToIndex = useCallback((next: number) => {
-    setTransitioning(true);
-    window.setTimeout(() => {
-      setIndex(next);
-      setTransitioning(false);
-    }, TRANSITION_MS);
-  }, []);
-
-  const finish = useCallback(() => {
-    setTransitioning(true);
-    window.setTimeout(() => {
-      router.push("/interests");
-    }, TRANSITION_MS);
-  }, [router]);
-
-  const handleSelect = useCallback(
-    (value: number) => {
-      if (transitioning) return;
-      const updated = new Map(responses);
-      updated.set(question.id, value);
-      setResponses(updated);
-      persistResponses(updated);
-
-      if (advanceTimer.current) clearTimeout(advanceTimer.current);
-      advanceTimer.current = setTimeout(() => {
-        if (isLast) {
-          finish();
-        } else {
-          goToIndex(index + 1);
-        }
-      }, ADVANCE_DELAY_MS);
-    },
-    [transitioning, responses, question.id, persistResponses, isLast, goToIndex, finish, index]
-  );
-
-  const handleBack = useCallback(() => {
-    if (isFirst || transitioning) return;
-    if (advanceTimer.current) clearTimeout(advanceTimer.current);
-    goToIndex(index - 1);
-  }, [isFirst, transitioning, goToIndex, index]);
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key >= "1" && e.key <= "7") {
-        handleSelect(Number(e.key));
-      } else if (e.key === "ArrowLeft" || e.key === "Backspace") {
-        if (!isFirst) {
-          e.preventDefault();
-          handleBack();
-        }
+  const persist = useCallback((next: (number | null)[]) => {
+    if (typeof window === "undefined") return;
+    const arr: QuizResponse[] = [];
+    for (let i = 0; i < QUIZ_QUESTIONS.length; i++) {
+      const value = next[i];
+      const q = QUIZ_QUESTIONS[i];
+      if (value !== null && value !== undefined) {
+        arr.push({ questionId: q.id, dataKey: q.dataKey, value });
       }
     }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [handleSelect, handleBack, isFirst]);
+    window.localStorage.setItem(RESPONSES_KEY, JSON.stringify(arr));
+    window.localStorage.setItem(
+      SCORES_KEY,
+      JSON.stringify(computeDimensionScores(arr))
+    );
+  }, []);
 
-  const circles = useMemo(
-    () =>
-      SCALE_VALUES.map((n) => ({
-        value: n,
-        diameter:
-          n === 1 || n === 7 ? 56 : n === 2 || n === 6 ? 50 : n === 3 || n === 5 ? 46 : 44,
-      })),
-    []
+  const setAnswer = useCallback(
+    (i: number, v: number) => {
+      setAnswers((prev) => {
+        const next = [...prev];
+        next[i] = v;
+        persist(next);
+        return next;
+      });
+    },
+    [persist]
   );
 
+  const done = answers.filter((a) => a !== null).length;
+  const complete = done === total;
+  const current = Math.min(total, done + 1);
+
+  function handleSubmit() {
+    if (!complete) return;
+    router.push("/interests");
+  }
+
   return (
-    <div className="min-h-screen w-full bg-white flex flex-col">
-      <div className="w-full px-5 sm:px-8 pt-6">
-        <div className="max-w-[600px] mx-auto">
-          <ProgressBar progress={progress} />
-          <div className="mt-3 flex items-center justify-between">
-            {isFirst ? (
-              <span aria-hidden className="block h-6" />
-            ) : (
-              <button
-                type="button"
-                onClick={handleBack}
-                className="font-body text-sm text-neutral-600 hover:text-primary transition-colors"
+    <div
+      className="journy-root journy-paper-texture"
+      style={{ background: PAPER, color: INK, position: "relative", minHeight: "100vh" }}
+    >
+      <div style={{ position: "relative", zIndex: 1 }}>
+        <QuizMasthead current={current} total={total} />
+        <section style={{ padding: "56px 40px 80px" }}>
+          <div style={{ maxWidth: 1020, margin: "0 auto" }}>
+            <div style={{ textAlign: "center", marginBottom: 48 }}>
+              <div
+                style={{
+                  fontFamily: SANS,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: "0.28em",
+                  textTransform: "uppercase",
+                  color: OXBLOOD,
+                }}
               >
-                ← Back
-              </button>
-            )}
-            <span className="font-body text-sm text-[#9CA3AF]">
-              {index + 1} of {total}
-            </span>
-          </div>
-        </div>
-      </div>
+                The Survey · twenty statements
+              </div>
+              <h1
+                style={{
+                  margin: "14px 0 0",
+                  fontFamily: SERIF,
+                  fontWeight: 700,
+                  fontVariationSettings: '"opsz" 120',
+                  fontSize: "clamp(38px, 5vw, 68px)",
+                  lineHeight: 1.0,
+                  letterSpacing: "-0.01em",
+                }}
+              >
+                The{" "}
+                <span style={{ fontStyle: "italic", fontWeight: 400 }}>Ledger</span>
+              </h1>
+              <p
+                style={{
+                  margin: "20px auto 0",
+                  maxWidth: 560,
+                  fontFamily: SERIF,
+                  fontSize: 16,
+                  lineHeight: 1.55,
+                  color: INK2,
+                }}
+              >
+                Twenty statements, a single sitting. Note each with the degree of your
+                agreement. No wrong answers; only preferences.
+              </p>
+            </div>
 
-      <main className="flex-1 flex items-center justify-center px-5 sm:px-8 py-12">
-        <div
-          className={`w-full max-w-[600px] flex flex-col items-center transition-opacity duration-[250ms] ${
-            transitioning ? "opacity-0" : "opacity-100"
-          }`}
-          aria-live="polite"
-        >
-          <h1 className="font-display font-bold text-2xl sm:text-[32px] text-[#111827] text-center leading-snug">
-            {question.statement}
-          </h1>
+            <div style={{ border: `1px solid ${INK}`, background: PAPER }}>
+              <div
+                className="journy-ledger-row"
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "72px 1fr 360px",
+                  gap: 24,
+                  alignItems: "end",
+                  padding: "14px 28px 12px",
+                  borderBottom: `1px solid ${INK}`,
+                  background: PAPER2,
+                }}
+              >
+                <div
+                  style={{
+                    fontFamily: SANS,
+                    fontSize: 9,
+                    fontWeight: 600,
+                    letterSpacing: "0.24em",
+                    textTransform: "uppercase",
+                    color: INK3,
+                  }}
+                >
+                  №
+                </div>
+                <div
+                  style={{
+                    fontFamily: SANS,
+                    fontSize: 9,
+                    fontWeight: 600,
+                    letterSpacing: "0.24em",
+                    textTransform: "uppercase",
+                    color: INK3,
+                  }}
+                >
+                  Statement
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontFamily: SANS,
+                    fontSize: 9.5,
+                    fontWeight: 600,
+                    letterSpacing: "0.24em",
+                    textTransform: "uppercase",
+                    color: INK2,
+                  }}
+                >
+                  <span>Disagree</span>
+                  <span
+                    style={{
+                      fontFamily: SERIF,
+                      fontStyle: "italic",
+                      fontWeight: 400,
+                      letterSpacing: 0,
+                      textTransform: "none",
+                      fontSize: 12,
+                      color: INK3,
+                    }}
+                  >
+                    — neutral —
+                  </span>
+                  <span>Agree</span>
+                </div>
+              </div>
 
-          <div className="mt-12 sm:mt-16 w-full">
-            <div className="flex items-center justify-between gap-1 sm:gap-2">
-              {circles.map(({ value, diameter }) => {
-                const selected = currentValue === value;
+              {QUIZ_QUESTIONS.map((q, i) => {
+                const value = answers[i];
+                const chapter = QUIZ_CHAPTERS[q.id] ?? "";
                 return (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => handleSelect(value)}
-                    aria-label={`Rate ${value} of 7`}
-                    aria-pressed={selected}
-                    className={`
-                      rounded-full border-2 flex-shrink-0
-                      transition-all duration-150
-                      ${
-                        selected
-                          ? "bg-primary border-primary scale-110 shadow-sm"
-                          : "bg-white border-[#D1D5DB] hover:border-primary"
-                      }
-                    `}
-                    style={{ width: diameter, height: diameter }}
-                  />
+                  <div
+                    key={q.id}
+                    className="journy-ledger-row"
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "72px 1fr 360px",
+                      gap: 24,
+                      alignItems: "center",
+                      padding: "22px 28px",
+                      borderBottom:
+                        i < QUIZ_QUESTIONS.length - 1
+                          ? `0.5px solid ${INK4}`
+                          : "none",
+                      background: value ? PAPER2 + "55" : "transparent",
+                      transition: "background 180ms",
+                    }}
+                  >
+                    <div>
+                      <div
+                        style={{
+                          fontFamily: MONO,
+                          fontSize: 13,
+                          color: value ? OXBLOOD : INK2,
+                          letterSpacing: "0.14em",
+                          fontWeight: 500,
+                        }}
+                      >
+                        {String(q.id).padStart(2, "0")}.
+                      </div>
+                      <div
+                        style={{
+                          fontFamily: SANS,
+                          fontSize: 8.5,
+                          letterSpacing: "0.24em",
+                          textTransform: "uppercase",
+                          color: INK4,
+                          marginTop: 4,
+                        }}
+                      >
+                        {chapter}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div
+                        style={{
+                          fontFamily: SERIF,
+                          fontSize: 17,
+                          lineHeight: 1.4,
+                          color: INK,
+                          textWrap: "pretty" as React.CSSProperties["textWrap"],
+                        }}
+                      >
+                        <span style={{ color: OXBLOOD, fontStyle: "italic" }}>
+                          &ldquo;
+                        </span>
+                        {q.statement}
+                        <span style={{ color: OXBLOOD, fontStyle: "italic" }}>
+                          &rdquo;
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <AgreeScale
+                        value={value}
+                        onChange={(v) => setAnswer(i, v)}
+                        size="md"
+                        showLabels={false}
+                      />
+                    </div>
+                  </div>
                 );
               })}
             </div>
-            <div className="mt-4 flex justify-between">
-              <span className="font-body text-xs sm:text-sm text-[#9CA3AF]">
-                Strongly Disagree
-              </span>
-              <span className="font-body text-xs sm:text-sm text-[#9CA3AF]">
-                Strongly Agree
-              </span>
+
+            <div
+              style={{
+                marginTop: 28,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 20,
+                flexWrap: "wrap",
+              }}
+            >
+              <div
+                style={{
+                  fontFamily: SERIF,
+                  fontStyle: "italic",
+                  fontSize: 14,
+                  color: INK3,
+                }}
+              >
+                — {done} of {total} noted
+                {done < total ? `, ${total - done} remain` : " in full"}.
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={!complete}
+                style={{
+                  fontFamily: SANS,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  letterSpacing: "0.2em",
+                  textTransform: "uppercase",
+                  padding: "18px 32px",
+                  background: complete ? INK : "transparent",
+                  color: complete ? PAPER : INK4,
+                  border: `1.5px solid ${complete ? INK : INK4}`,
+                  borderRadius: 0,
+                  cursor: complete ? "pointer" : "not-allowed",
+                  transition: "background 120ms, color 120ms, border-color 120ms",
+                }}
+                onMouseEnter={(e) => {
+                  if (complete) {
+                    e.currentTarget.style.background = OXBLOOD;
+                    e.currentTarget.style.borderColor = OXBLOOD;
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (complete) {
+                    e.currentTarget.style.background = INK;
+                    e.currentTarget.style.borderColor = INK;
+                  }
+                }}
+              >
+                Submit the ledger — to Interests ▸
+              </button>
             </div>
           </div>
-        </div>
-      </main>
+        </section>
+      </div>
     </div>
   );
 }

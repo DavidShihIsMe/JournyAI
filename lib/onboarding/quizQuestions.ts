@@ -18,6 +18,29 @@ export interface QuizQuestion {
   personalityScoring: PersonalityScore[] | null;
 }
 
+export const QUIZ_CHAPTERS: Record<number, string> = {
+  1: "On Starting",
+  2: "On Planning",
+  3: "On Planning",
+  4: "On Comfort",
+  5: "On Culture",
+  6: "On Food",
+  7: "On Sights",
+  8: "On Guidance",
+  9: "On Evenings",
+  10: "On Food",
+  11: "On Movement",
+  12: "On Nature",
+  13: "On Pacing",
+  14: "On Otherness",
+  15: "On Adventure",
+  16: "On Photography",
+  17: "On Shopping",
+  18: "On Pacing",
+  19: "On Culture",
+  20: "On Evenings",
+};
+
 export const QUIZ_QUESTIONS: QuizQuestion[] = [
   {
     id: 1,

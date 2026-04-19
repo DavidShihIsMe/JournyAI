@@ -144,3 +144,16 @@ html {
     grid-template-columns: 1fr !important;
   }
 }
+
+@media (max-width: 860px) {
+  .journy-ledger-row {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+  .journy-interests-index {
+    column-count: 1 !important;
+  }
+  .journy-quiz-topstrip {
+    display: none !important;
+  }
+}
