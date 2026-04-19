@@ -35,21 +35,9 @@ export default function QuizPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const raw = window.localStorage.getItem(RESPONSES_KEY);
-    if (!raw) return;
-    try {
-      const parsed: QuizResponse[] = JSON.parse(raw);
-      const next = Array(total).fill(null) as (number | null)[];
-      const byId = new Map(QUIZ_QUESTIONS.map((q, i) => [q.id, i]));
-      for (const r of parsed) {
-        const idx = byId.get(r.questionId);
-        if (idx !== undefined) next[idx] = r.value;
-      }
-      setAnswers(next);
-    } catch {
-      // ignore
-    }
-  }, [total]);
+    window.localStorage.removeItem(RESPONSES_KEY);
+    window.localStorage.removeItem(SCORES_KEY);
+  }, []);
 
   const persist = useCallback((next: (number | null)[]) => {
     if (typeof window === "undefined") return;
