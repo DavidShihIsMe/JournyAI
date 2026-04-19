@@ -17,7 +17,7 @@ export default function OnboardingLayout({
 }) {
   const pathname = usePathname();
   const progress = PROGRESS_MAP[pathname] ?? 0;
-  const fullBleedRoutes = new Set(["/quiz", "/interests"]);
+  const fullBleedRoutes = new Set(["/quiz", "/interests", "/type-reveal"]);
   const isFullBleed = fullBleedRoutes.has(pathname);
   const showProgress = pathname !== "/type-reveal" && !isFullBleed;
 

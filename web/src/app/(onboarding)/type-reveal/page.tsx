@@ -1,37 +1,58 @@
-import Link from "next/link";
+"use client";
+
+import RevealHero from "@/components/typereveal/RevealHero";
+import Dossier from "@/components/typereveal/Dossier";
+import { FRCO } from "@/components/typereveal/typeData";
+import { INK, PAPER } from "@/components/landing/brand";
 
 export default function TypeRevealPage() {
+  const type = FRCO;
+  const axes = [
+    {
+      label: "Rhythm",
+      left: "Plan",
+      right: "Flow",
+      active: (type.code[0] === "F" ? 1 : 0) as 0 | 1,
+    },
+    {
+      label: "Pace",
+      left: "Busy",
+      right: "Relaxed",
+      active: (type.code[1] === "R" ? 1 : 0) as 0 | 1,
+    },
+    {
+      label: "Appetite",
+      left: "Adventure",
+      right: "Cultural",
+      active: (type.code[2] === "C" ? 1 : 0) as 0 | 1,
+    },
+    {
+      label: "Setting",
+      left: "Indoors",
+      right: "Outdoors",
+      active: (type.code[3] === "O" ? 1 : 0) as 0 | 1,
+    },
+  ];
+
   return (
-    <div className="flex flex-col items-center text-center gap-8 py-12">
-      <p className="font-body text-sm font-medium text-primary uppercase tracking-wider">
-        Your traveler type
-      </p>
-
-      <h1 className="font-display font-black text-4xl text-neutral-900">
-        The Explorer
-      </h1>
-
-      <div className="inline-flex items-center justify-center rounded-full px-4 py-1.5 font-body text-sm font-semibold text-white tracking-wider bg-[#3A8A7A]">
-        FRAI
+    <div
+      className="journy-root journy-paper-texture"
+      style={{
+        background: PAPER,
+        color: INK,
+        position: "relative",
+        minHeight: "100vh",
+      }}
+    >
+      <div style={{ position: "relative", zIndex: 1 }}>
+        <RevealHero
+          code={type.code}
+          name={type.name}
+          color={type.color}
+          axes={axes}
+        />
+        <Dossier type={type} />
       </div>
-
-      <p className="font-body text-neutral-600 max-w-md leading-relaxed">
-        Placeholder type description — this will show the user&apos;s actual
-        traveler type once the quiz flow is connected.
-      </p>
-
-      <div className="w-full bg-neutral-100 rounded-2xl h-[200px] flex items-center justify-center">
-        <p className="font-body text-sm text-neutral-400">
-          Placeholder: Dimension Sliders
-        </p>
-      </div>
-
-      <Link
-        href="/signup"
-        className="h-[52px] rounded-[12px] bg-primary px-8 flex items-center font-body text-base font-semibold text-white hover:bg-primary-dark transition-colors w-full justify-center"
-      >
-        Create Account to Save Results
-      </Link>
     </div>
   );
 }

@@ -153,7 +153,24 @@ html {
   .journy-interests-index {
     column-count: 1 !important;
   }
-  .journy-quiz-topstrip {
+  .journy-quiz-topstrip,
+  .journy-reveal-topstrip {
     display: none !important;
+  }
+  .journy-dossier-2col,
+  .journy-dossier-charter {
+    grid-template-columns: 1fr !important;
+    gap: 32px !important;
+  }
+  .journy-dossier-behavior-row {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+  }
+  .journy-dossier-compat {
+    grid-template-columns: 1fr !important;
+  }
+  .journy-reveal-axes {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 18px !important;
   }
 }
