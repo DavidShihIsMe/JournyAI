@@ -4,10 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Masthead from "@/components/landing/Masthead";
 import Hero from "@/components/landing/Hero";
-import Premise from "@/components/landing/Premise";
 import Notations from "@/components/landing/Notations";
 import Process from "@/components/landing/Process";
 import Archive from "@/components/landing/Archive";
+import Roadmap from "@/components/landing/Roadmap";
 import { FinalCTA, Footer, SignInModal } from "@/components/landing/Ending";
 
 export default function LandingPage() {
@@ -38,10 +38,10 @@ export default function LandingPage() {
       <div style={{ position: "relative", zIndex: 1 }}>
         <Masthead onSignIn={() => setSignInOpen(true)} onStart={handleStart} />
         <Hero onStart={handleStart} onSample={handleSample} />
-        <Premise />
-        <Notations onStart={handleStart} />
         <Process onStart={handleStart} />
+        <Notations onStart={handleStart} />
         <Archive onSample={handleSample} />
+        <Roadmap onStart={handleStart} />
         <FinalCTA onStart={handleStart} onSample={handleSample} />
         <Footer />
         <SignInModal open={signInOpen} onClose={() => setSignInOpen(false)} />

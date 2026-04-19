@@ -2,19 +2,16 @@
 
 import { useState } from "react";
 import {
-  DENIM,
   GROUP,
   INK,
   INK2,
   INK3,
   MONO,
-  OCHRE,
   OXBLOOD,
   PAPER,
   PAPER2,
   SANS,
   SERIF,
-  TERRA,
 } from "./brand";
 
 const TYPE_LIST: Array<[string, string, "PB" | "PR" | "FB" | "FR"]> = [
@@ -107,54 +104,17 @@ export default function Notations({ onStart }: NotationsProps) {
               style={{
                 margin: 0,
                 fontFamily: SERIF,
-                fontSize: 17,
-                lineHeight: 1.6,
+                fontSize: 18,
+                lineHeight: 1.55,
                 color: INK2,
                 textWrap: "pretty" as React.CSSProperties["textWrap"],
-                maxWidth: 560,
+                maxWidth: 520,
               }}
             >
-              Four axes, each a honest question: do you <em>plan</em> or <em>flow</em>; move{" "}
-              <em>busy</em> or <em>relaxed</em>; crave the <em>cultural</em> or the{" "}
-              <em>adventurous</em>; sit <em>indoors</em> or <em>outdoors</em>. Sixteen
-              combinations. Every guidebook begins here.
+              Four axes —{" "}
+              <em>plan or flow, busy or relaxed, cultural or adventure, indoors or outdoors.</em>{" "}
+              Sixteen combinations. Every guidebook begins here.
             </p>
-            <div
-              style={{
-                display: "flex",
-                gap: 20,
-                marginTop: 22,
-                fontFamily: MONO,
-                fontSize: 11,
-                letterSpacing: "0.14em",
-                textTransform: "uppercase",
-                color: INK3,
-                flexWrap: "wrap",
-              }}
-            >
-              {(
-                [
-                  ["Plan · Busy", OCHRE],
-                  ["Plan · Relaxed", OXBLOOD],
-                  ["Flow · Busy", TERRA],
-                  ["Flow · Relaxed", DENIM],
-                ] as const
-              ).map(([label, color]) => (
-                <span key={label}>
-                  <span
-                    style={{
-                      display: "inline-block",
-                      width: 10,
-                      height: 10,
-                      border: `1.5px solid ${color}`,
-                      marginRight: 8,
-                      verticalAlign: "-1px",
-                    }}
-                  />
-                  {label}
-                </span>
-              ))}
-            </div>
           </div>
         </div>
 

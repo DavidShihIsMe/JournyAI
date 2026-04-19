@@ -1,6 +1,6 @@
 "use client";
 
-import { INK, INK2, INK3, INK4, MONO, OXBLOOD, PAPER, SANS, SERIF } from "./brand";
+import { INK, INK2, INK3, OXBLOOD, PAPER, SANS, SERIF, MONO } from "./brand";
 
 interface HeroProps {
   onStart: () => void;
@@ -13,7 +13,7 @@ export default function Hero({ onStart, onSample }: HeroProps) {
       id="top"
       style={{
         position: "relative",
-        padding: "80px 40px 100px",
+        padding: "80px 40px 110px",
         borderBottom: `1px solid ${INK}`,
         overflow: "hidden",
       }}
@@ -86,16 +86,15 @@ export default function Hero({ onStart, onSample }: HeroProps) {
                 margin: 0,
                 fontFamily: SERIF,
                 fontSize: 22,
-                lineHeight: 1.45,
+                lineHeight: 1.5,
                 color: INK,
                 textWrap: "pretty" as React.CSSProperties["textWrap"],
               }}
             >
-              <span style={{ fontStyle: "italic" }}>Twelve statements.</span> One of sixteen
-              notations. A pocket guidebook of cities, rooms, and hours —
-              <span style={{ color: OXBLOOD }}>
-                {" "}
-                rewritten for the way you actually travel.
+              Answer twenty statements. Receive your notation — one of sixteen — and a
+              guidebook{" "}
+              <span style={{ color: OXBLOOD, fontStyle: "italic" }}>
+                written for the way you actually travel.
               </span>
             </p>
 
@@ -152,34 +151,8 @@ export default function Hero({ onStart, onSample }: HeroProps) {
                   textDecorationThickness: "0.5px",
                 }}
               >
-                — or read a sample dossier
+                — or read a sample
               </a>
-            </div>
-
-            <div
-              style={{
-                marginTop: 24,
-                display: "flex",
-                gap: 18,
-                alignItems: "center",
-                color: INK3,
-                flexWrap: "wrap",
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: MONO,
-                  fontSize: 11,
-                  letterSpacing: "0.14em",
-                  textTransform: "uppercase",
-                }}
-              >
-                No account required
-              </span>
-              <span style={{ color: INK4 }}>·</span>
-              <span style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 13 }}>
-                — free to read. Printable on request.
-              </span>
             </div>
           </div>
 
@@ -239,50 +212,6 @@ export default function Hero({ onStart, onSample }: HeroProps) {
               specimen · the dreamer
             </div>
           </div>
-        </div>
-
-        <div
-          style={{
-            marginTop: 80,
-            paddingTop: 18,
-            borderTop: `1px solid ${INK}`,
-            display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
-            gap: 24,
-          }}
-        >
-          {[
-            ["XVI", "Notations"],
-            ["XII", "Statements"],
-            ["CXX", "Cities covered"],
-            ["MMXXV", "Established"],
-          ].map(([num, label]) => (
-            <div key={label}>
-              <div
-                style={{
-                  fontFamily: MONO,
-                  fontSize: 22,
-                  letterSpacing: "0.08em",
-                  color: INK,
-                  fontVariantNumeric: "tabular-nums",
-                }}
-              >
-                {num}
-              </div>
-              <div
-                style={{
-                  fontFamily: SANS,
-                  fontSize: 10,
-                  letterSpacing: "0.22em",
-                  textTransform: "uppercase",
-                  color: INK3,
-                  marginTop: 6,
-                }}
-              >
-                {label}
-              </div>
-            </div>
-          ))}
         </div>
       </div>
     </section>

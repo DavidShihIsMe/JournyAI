@@ -72,8 +72,8 @@ export default function Masthead({ onSignIn, onStart }: MastheadProps) {
           {[
             ["Types", "#types"],
             ["Process", "#process"],
-            ["Archive", "#archive"],
-            ["About", "#about"],
+            ["Sample", "#archive"],
+            ["Roadmap", "#roadmap"],
           ].map(([label, href]) => (
             <a
               key={label}

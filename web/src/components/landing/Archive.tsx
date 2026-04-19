@@ -91,7 +91,7 @@ export default function Archive({ onSample }: ArchiveProps) {
                 color: OXBLOOD,
               }}
             >
-              From the Archive
+              A Sample
             </div>
             <h2
               style={{
@@ -106,7 +106,7 @@ export default function Archive({ onSample }: ArchiveProps) {
                 maxWidth: "20ch",
               }}
             >
-              A specimen page — Lisbon, for a Dreamer.
+              Lisbon, for a Dreamer.
             </h2>
           </div>
           <div
@@ -119,7 +119,7 @@ export default function Archive({ onSample }: ArchiveProps) {
               maxWidth: 260,
             }}
           >
-            — the same city, written for a Director, reads nothing like this.
+            — the same city reads differently for each notation.
           </div>
         </div>
 
@@ -415,10 +415,9 @@ export default function Archive({ onSample }: ArchiveProps) {
                   textWrap: "pretty" as React.CSSProperties["textWrap"],
                 }}
               >
-                Every entry in your guidebook is chosen for the notation. The Dreamer gets
-                tram rides and long lunches; the Director gets reservations and optimized
-                minutes; the Pilgrim walks. Nothing generic, nothing &ldquo;trending,&rdquo;
-                nothing recommended by the crowd.
+                Every entry is chosen for the notation. A Dreamer gets tram rides and long
+                lunches; a Director gets reservations and optimized minutes. Nothing
+                generic, nothing trending.
               </p>
             </div>
 
