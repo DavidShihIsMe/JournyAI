@@ -74,6 +74,11 @@ export default function QuizPage() {
 
   function handleSubmit() {
     if (!complete) return;
+    if (typeof window !== "undefined") {
+      const raw = window.localStorage.getItem(RESPONSES_KEY);
+      const saved = raw ? JSON.parse(raw) : [];
+      console.log("[quiz] submit — responses saved to localStorage:", saved);
+    }
     router.push("/interests");
   }
 
