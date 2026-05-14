@@ -6,7 +6,7 @@ Next.js web application for the Journy travel personality platform.
 
 ```bash
 npm install
-cp .env.example .env.local   # Add your Supabase credentials
+cp .env.example .env.local   # Add OPENAI_API_KEY (and optional GOOGLE_MAPS_API_KEY)
 npm run dev                  # http://localhost:3000
 ```
 
@@ -19,9 +19,7 @@ This project deploys automatically via Vercel.
 2. Go to vercel.com and sign in with GitHub
 3. Click "Add New Project" and select this repo
 4. Set Root Directory to `web`
-5. Add environment variables:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+5. Add environment variables (at minimum `OPENAI_API_KEY`; optional `OPENAI_MODEL`, `GOOGLE_MAPS_API_KEY`)
 6. Click Deploy
 7. After deployment, go to Settings > Domains
 8. Add your custom domain
