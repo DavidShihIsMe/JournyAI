@@ -18,7 +18,7 @@ export default function DashboardNav() {
     <>
       {/* Desktop sidebar */}
       <aside
-        className="hidden md:flex flex-col w-60 p-6 gap-2"
+        className="hidden w-60 shrink-0 flex-col gap-2 p-6 md:flex md:min-h-dvh"
         style={{ borderRight: `1px solid ${INK}`, background: PAPER2 }}
       >
         <Link

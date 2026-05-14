@@ -3,7 +3,10 @@ import { INK, INK2, INK3, PAPER, PAPER2, SANS, SERIF } from "@/components/landin
 
 export default function FriendsPage() {
   return (
-    <div className="journy-root journy-paper-texture flex flex-col gap-6" style={{ background: PAPER, color: INK, border: `1px solid ${INK}` }}>
+    <div
+      className="journy-root journy-paper-texture flex min-h-0 w-full flex-1 flex-col gap-6"
+      style={{ background: PAPER, color: INK, border: `1px solid ${INK}` }}
+    >
       <div style={{ borderBottom: `1px solid ${INK}`, background: PAPER2, padding: "18px 24px" }}>
         <div style={{ fontFamily: SANS, fontSize: 10, letterSpacing: "0.24em", textTransform: "uppercase", color: INK3 }}>
           Social Ledger · Friends
@@ -16,9 +19,12 @@ export default function FriendsPage() {
         </p>
       </div>
 
-      <div className="px-6 pt-2">
-        <div className="p-8 flex flex-col items-center text-center gap-4" style={{ border: `1px solid ${INK3}`, background: `${PAPER2}99` }}>
-          <div className="w-full h-[200px] flex items-center justify-center" style={{ border: `1px solid ${INK3}`, background: PAPER }}>
+      <div className="flex min-h-0 flex-1 flex-col px-6 pt-2">
+        <div
+          className="flex min-h-[min(320px,48vh)] flex-1 flex-col items-center gap-4 p-8 text-center"
+          style={{ border: `1px solid ${INK3}`, background: `${PAPER2}99` }}
+        >
+          <div className="flex min-h-[200px] w-full flex-1 items-center justify-center" style={{ border: `1px solid ${INK3}`, background: PAPER }}>
             <span style={{ fontFamily: SANS, fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", color: INK3 }}>
               Placeholder: Friends List
             </span>
@@ -30,7 +36,7 @@ export default function FriendsPage() {
         </div>
       </div>
 
-      <div className="px-6 pb-6">
+      <div className="mt-auto px-6 pb-6">
         <Link
           href="/home"
           className="inline-flex items-center px-4 py-2"
