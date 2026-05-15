@@ -79,7 +79,7 @@ export default function QuizPage() {
       const saved = raw ? JSON.parse(raw) : [];
       console.log("[quiz] submit — responses saved to localStorage:", saved);
     }
-    router.push("/interests");
+    router.push("/profile");
   }
 
   return (
@@ -333,7 +333,7 @@ export default function QuizPage() {
                   }
                 }}
               >
-                Submit the ledger — to Interests ▸
+                Submit the ledger — to Profile ▸
               </button>
             </div>
           </div>

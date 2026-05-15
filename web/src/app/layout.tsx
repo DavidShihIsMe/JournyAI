@@ -64,9 +64,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${playfairDisplay.variable} ${lora.variable} ${fraunces.variable} ${inter.variable} ${dmMono.variable} h-full`}
+      className={`${playfairDisplay.variable} ${lora.variable} ${fraunces.variable} ${inter.variable} ${dmMono.variable} min-h-dvh`}
     >
-      <body className="min-h-full flex flex-col antialiased">{children}</body>
+      <body className="flex min-h-dvh flex-col antialiased">{children}</body>
     </html>
   );
 }
