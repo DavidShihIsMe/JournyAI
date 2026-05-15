@@ -490,19 +490,6 @@ export default function PlanPage() {
               </div>
               <div className="min-w-0">
                 <label className="flex flex-col gap-2">
-                  <span style={labelCaps}>Airline (optional)</span>
-                  <input
-                    name="flightAirline"
-                    value={flightAirlineInput}
-                    onChange={(e) => setFlightAirlineInput(e.target.value)}
-                    placeholder="e.g. United"
-                    className="w-full px-3 py-2 outline-none"
-                    style={inputStyle}
-                  />
-                </label>
-              </div>
-              <div className="min-w-0">
-                <label className="flex flex-col gap-2">
                   <span style={labelCaps}>Flight number</span>
                   <input
                     name="flightNumber"
