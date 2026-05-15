@@ -12,6 +12,11 @@ interface TripRequest {
   flightPreferencesText?: string;
   flightNumber?: string;
   flightAirline?: string;
+  flightDate?: string;
+  flightDepartureTime?: string;
+  flightArrivalTime?: string;
+  flightOrigin?: string;
+  flightDestination?: string;
   groundTravelMode?: string;
   groundTravelOther?: string;
   groundTravelDuration?: string;
@@ -45,6 +50,11 @@ export async function POST(request: Request) {
     flightPreferencesText: raw.flightPreferencesText,
     flightNumber: raw.flightNumber,
     flightAirline: raw.flightAirline,
+    flightDate: raw.flightDate,
+    flightDepartureTime: raw.flightDepartureTime,
+    flightArrivalTime: raw.flightArrivalTime,
+    flightOrigin: raw.flightOrigin,
+    flightDestination: raw.flightDestination,
     groundTravelMode: raw.groundTravelMode,
     groundTravelOther: raw.groundTravelOther,
     groundTravelDuration: raw.groundTravelDuration,
@@ -175,15 +185,28 @@ function formatFlight(input: TripRequest): string {
   if (status === "booked") {
     const airline = input.flightAirline?.trim() || "";
     const fn = input.flightNumber?.trim() || "";
+    const origin = input.flightOrigin?.trim() || "";
+    const dest = input.flightDestination?.trim() || "";
+    const depRaw = input.flightDepartureTime?.trim() || "";
+    const arrRaw = input.flightArrivalTime?.trim() || "";
+
+    if (depRaw && arrRaw) {
+      const dep = new Date(depRaw).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
+      const arr = new Date(arrRaw).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
+      return [
+        fn ? `Flight ${fn} confirmed.` : "Flight confirmed.",
+        origin && dest ? `Route: ${origin} → ${dest}.` : "",
+        `Departs ${dep}, arrives ${dest || "destination"} at ${arr} (scheduled UTC times — adjust for local airport timezone if needed).`,
+        "Add ~30–45 min for deplaning and exiting the airport before any Day 1 activity.",
+      ].filter(Boolean).join(" ");
+    }
+
     return [
       "Flight already booked.",
       airline ? `Airline: ${airline}.` : "",
       fn ? `Flight number: ${fn}.` : "Flight number not provided.",
-      "Exact landing time varies by day — confirm in the airline app or via a flight-status search.",
-      "This app does not call Google or airline APIs for live times yet.",
-    ]
-      .filter(Boolean)
-      .join(" ");
+      "Live times unavailable — confirm landing time before scheduling Day 1 activities.",
+    ].filter(Boolean).join(" ");
   }
   if (status === "ground_travel") {
     const how = formatGroundTravelMode(input);

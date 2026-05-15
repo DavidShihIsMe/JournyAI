@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties, FormEvent } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { INK, INK2, INK3, OXBLOOD, PAPER, PAPER2, SANS, SERIF } from "@/components/landing/brand";
@@ -73,10 +73,52 @@ export default function PlanPage() {
   const [flightBookingStatus, setFlightBookingStatus] = useState<string>(FLIGHT_NOT_BOOKED);
   const [flightNumberInput, setFlightNumberInput] = useState("");
   const [flightAirlineInput, setFlightAirlineInput] = useState("");
+  const [flightDate, setFlightDate] = useState("");
+  const [flightLookupStatus, setFlightLookupStatus] = useState<"idle" | "loading" | "found" | "not_found" | "error">("idle");
+  const [resolvedFlight, setResolvedFlight] = useState<{
+    origin: string;
+    destination: string;
+    departureScheduled: string;
+    arrivalScheduled: string;
+    airline: string;
+  } | null>(null);
   const [groundTravelMode, setGroundTravelMode] = useState<string>("train");
   const [mustHaves, setMustHaves] = useState<MustHaveRow[]>([emptyMustHave()]);
 
   const hotelOptions = useMemo(() => hotelsForDestination(destinationInput), [destinationInput]);
+
+  useEffect(() => {
+    if (flightBookingStatus !== FLIGHT_BOOKED) return;
+    if (!flightDate || !flightNumberInput.trim()) return;
+
+    setFlightLookupStatus("loading");
+    setResolvedFlight(null);
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/flight-lookup?flightNumber=${encodeURIComponent(flightNumberInput.trim())}&date=${flightDate}`
+        );
+        const data = await res.json() as { found: boolean; origin?: string; destination?: string; departureScheduled?: string; arrivalScheduled?: string; airline?: string };
+        if (data.found) {
+          setResolvedFlight({
+            origin: data.origin ?? "",
+            destination: data.destination ?? "",
+            departureScheduled: data.departureScheduled ?? "",
+            arrivalScheduled: data.arrivalScheduled ?? "",
+            airline: data.airline ?? "",
+          });
+          setFlightLookupStatus("found");
+        } else {
+          setFlightLookupStatus("not_found");
+        }
+      } catch {
+        setFlightLookupStatus("error");
+      }
+    }, 900);
+
+    return () => clearTimeout(timer);
+  }, [flightDate, flightNumberInput, flightBookingStatus]);
 
   function updateMustHave(id: string, patch: Partial<MustHaveCard>) {
     setMustHaves((rows) => rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
@@ -148,6 +190,11 @@ export default function PlanPage() {
         flightBookingStatusValue === FLIGHT_NOT_BOOKED ? flightPreferencesText : "",
       flightNumber: flightBookingStatusValue === FLIGHT_BOOKED ? flightNumber : "",
       flightAirline: flightBookingStatusValue === FLIGHT_BOOKED ? flightAirline : "",
+      flightDate: flightBookingStatusValue === FLIGHT_BOOKED ? flightDate : "",
+      flightDepartureTime: flightBookingStatusValue === FLIGHT_BOOKED ? (resolvedFlight?.departureScheduled ?? "") : "",
+      flightArrivalTime: flightBookingStatusValue === FLIGHT_BOOKED ? (resolvedFlight?.arrivalScheduled ?? "") : "",
+      flightOrigin: flightBookingStatusValue === FLIGHT_BOOKED ? (resolvedFlight?.origin ?? "") : "",
+      flightDestination: flightBookingStatusValue === FLIGHT_BOOKED ? (resolvedFlight?.destination ?? "") : "",
       groundTravelMode: flightBookingStatusValue === FLIGHT_GROUND ? groundTravelModeValue : "",
       groundTravelOther: flightBookingStatusValue === FLIGHT_GROUND ? groundTravelOther : "",
       groundTravelDuration: flightBookingStatusValue === FLIGHT_GROUND ? groundTravelDuration : "",
@@ -425,6 +472,24 @@ export default function PlanPage() {
             <>
               <div className="min-w-0">
                 <label className="flex flex-col gap-2">
+                  <span style={labelCaps}>Flight date</span>
+                  <input
+                    type="date"
+                    name="flightDate"
+                    value={flightDate}
+                    onChange={(e) => {
+                      setFlightDate(e.target.value);
+                      setFlightLookupStatus("idle");
+                      setResolvedFlight(null);
+                    }}
+                    required
+                    className="w-full px-3 py-2 outline-none"
+                    style={inputStyle}
+                  />
+                </label>
+              </div>
+              <div className="min-w-0">
+                <label className="flex flex-col gap-2">
                   <span style={labelCaps}>Airline (optional)</span>
                   <input
                     name="flightAirline"
@@ -442,7 +507,11 @@ export default function PlanPage() {
                   <input
                     name="flightNumber"
                     value={flightNumberInput}
-                    onChange={(e) => setFlightNumberInput(e.target.value)}
+                    onChange={(e) => {
+                      setFlightNumberInput(e.target.value);
+                      setFlightLookupStatus("idle");
+                      setResolvedFlight(null);
+                    }}
                     required
                     placeholder="e.g. UA857"
                     className="w-full px-3 py-2 outline-none"
@@ -451,7 +520,7 @@ export default function PlanPage() {
                 </label>
               </div>
               <div className="min-w-0 md:col-span-2">
-                <FlightGoogleLink airline={flightAirlineInput} flightNumber={flightNumberInput} />
+                <FlightLookupStatus status={flightLookupStatus} flight={resolvedFlight} />
               </div>
             </>
           ) : null}
@@ -671,31 +740,30 @@ export default function PlanPage() {
   );
 }
 
-function FlightGoogleLink({ airline, flightNumber }: { airline: string; flightNumber: string }) {
-  const fn = flightNumber.trim();
-  if (!fn) return null;
-  const q = [airline.trim(), fn].filter(Boolean).join(" ");
-  const href = `https://www.google.com/search?q=${encodeURIComponent(`${q} flight status arrival`)}`;
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="inline-flex w-fit px-3 py-2 transition hover:opacity-90"
-      style={{
-        border: `1px solid ${INK}`,
-        background: PAPER,
-        color: INK,
-        fontFamily: SANS,
-        fontSize: 10,
-        letterSpacing: "0.14em",
-        textTransform: "uppercase",
-        fontWeight: 600,
-      }}
-    >
-      Look up arrival on Google
-    </a>
-  );
+function FlightLookupStatus({
+  status,
+  flight,
+}: {
+  status: "idle" | "loading" | "found" | "not_found" | "error";
+  flight: { origin: string; destination: string; departureScheduled: string; arrivalScheduled: string; airline: string } | null;
+}) {
+  if (status === "idle") return null;
+  if (status === "loading") {
+    return <p style={{ fontFamily: SERIF, fontSize: 13, color: INK3 }}>Looking up flight times…</p>;
+  }
+  if (status === "found" && flight) {
+    const dep = new Date(flight.departureScheduled).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const arr = new Date(flight.arrivalScheduled).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return (
+      <p style={{ fontFamily: SERIF, fontSize: 13, color: "#15803d" }}>
+        ✓ {flight.origin} → {flight.destination} · Departs {dep} · Arrives {arr}
+      </p>
+    );
+  }
+  if (status === "not_found") {
+    return <p style={{ fontFamily: SERIF, fontSize: 13, color: INK3 }}>Flight not found — times won&apos;t be included, you can still continue.</p>;
+  }
+  return <p style={{ fontFamily: SERIF, fontSize: 13, color: INK3 }}>Couldn&apos;t reach flight data — you can still continue.</p>;
 }
 
 function Field({
