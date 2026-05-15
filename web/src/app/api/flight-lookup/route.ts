@@ -10,7 +10,8 @@ export async function GET(request: Request) {
   const apiKey = process.env.AVIATIONSTACK_API_KEY;
   if (!apiKey) return NextResponse.json({ found: false, error: "no_key" });
 
-  const url = `https://api.aviationstack.com/v1/flights?access_key=${apiKey}&flight_iata=${encodeURIComponent(flightNumber)}&flight_date=${encodeURIComponent(date)}`;
+  // AviationStack free plan requires HTTP (not HTTPS)
+  const url = `http://api.aviationstack.com/v1/flights?access_key=${apiKey}&flight_iata=${encodeURIComponent(flightNumber)}&flight_date=${encodeURIComponent(date)}`;
 
   let data: unknown;
   try {
@@ -21,7 +22,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ found: false });
   }
 
-  const flight = (data as { data?: unknown[] })?.data?.[0] as Record<string, Record<string, string>> | undefined;
+  const parsed = data as { data?: unknown[]; error?: unknown };
+  if (parsed.error) console.error("AviationStack error:", JSON.stringify(parsed.error));
+  const flight = parsed.data?.[0] as Record<string, Record<string, string>> | undefined;
   if (!flight) return NextResponse.json({ found: false });
 
   return NextResponse.json({
