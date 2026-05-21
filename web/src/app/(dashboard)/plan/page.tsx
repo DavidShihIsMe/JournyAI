@@ -1,11 +1,12 @@
 "use client";
 
 import type { CSSProperties, FormEvent } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { INK, INK2, INK3, OXBLOOD, PAPER, PAPER2, SANS, SERIF } from "@/components/landing/brand";
 import { HOTEL_OPTION_NA, HOTEL_OPTION_OTHER, hotelsForDestination } from "@/lib/demoHotels";
+import type { HotelOption } from "@/lib/hotelTypes";
 import { RESULT_STORAGE_KEY, TRIP_META_STORAGE_KEY } from "@/lib/tripStorageKeys";
 import { normalizeItineraryDays, type GeneratedItinerary, type MustHaveCard } from "@/lib/tripTypes";
 
@@ -75,8 +76,64 @@ export default function PlanPage() {
   const [flightAirlineInput, setFlightAirlineInput] = useState("");
   const [groundTravelMode, setGroundTravelMode] = useState<string>("train");
   const [mustHaves, setMustHaves] = useState<MustHaveRow[]>([emptyMustHave()]);
+  const [hotelOptions, setHotelOptions] = useState<HotelOption[]>([]);
+  const [hotelsLoading, setHotelsLoading] = useState(false);
+  const [hotelsSource, setHotelsSource] = useState<"google" | "fallback" | "empty" | null>(null);
+  const [hotelsMessage, setHotelsMessage] = useState<string | null>(null);
+  const [selectedHotelMeta, setSelectedHotelMeta] = useState<HotelOption | null>(null);
 
-  const hotelOptions = useMemo(() => hotelsForDestination(destinationInput), [destinationInput]);
+  useEffect(() => {
+    const dest = destinationInput.trim();
+    if (!dest) {
+      setHotelOptions([]);
+      setHotelsSource("empty");
+      setHotelsMessage(null);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      void (async () => {
+        setHotelsLoading(true);
+        setHotelsMessage(null);
+        try {
+          const res = await fetch(`/api/hotels?destination=${encodeURIComponent(dest)}`);
+          const data = (await res.json()) as {
+            hotels?: HotelOption[];
+            source?: "google" | "fallback" | "empty";
+            message?: string;
+          };
+          const list = data.hotels?.length
+            ? data.hotels
+            : hotelsForDestination(dest).map((name) => ({ name }));
+          setHotelOptions(list);
+          setHotelsSource(data.source ?? "fallback");
+          setHotelsMessage(data.message ?? null);
+        } catch {
+          setHotelOptions(hotelsForDestination(dest).map((name) => ({ name })));
+          setHotelsSource("fallback");
+          setHotelsMessage("Could not load hotels — using built-in suggestions.");
+        } finally {
+          setHotelsLoading(false);
+        }
+      })();
+    }, 450);
+
+    return () => clearTimeout(timer);
+  }, [destinationInput]);
+
+  useEffect(() => {
+    if (
+      stayingHotel === HOTEL_OPTION_NA ||
+      stayingHotel === HOTEL_OPTION_OTHER ||
+      !hotelOptions.length
+    ) {
+      return;
+    }
+    if (!hotelOptions.some((h) => h.name === stayingHotel)) {
+      setStayingHotel(HOTEL_OPTION_NA);
+      setSelectedHotelMeta(null);
+    }
+  }, [hotelOptions, stayingHotel]);
 
   function updateMustHave(id: string, patch: Partial<MustHaveCard>) {
     setMustHaves((rows) => rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
@@ -118,8 +175,13 @@ export default function PlanPage() {
       }))
       .filter((c) => c.timeBlock || c.activity || c.where || c.details);
 
-    const hotelAddress = String(formData.get("hotelAddress") ?? "").trim();
+    const hotelAddressField = String(formData.get("hotelAddress") ?? "").trim();
+    const hotelPlaceId = String(formData.get("hotelPlaceId") ?? "").trim();
     const staying = String(formData.get("stayingHotel") ?? HOTEL_OPTION_NA);
+    const hotelAddress =
+      staying === HOTEL_OPTION_OTHER
+        ? hotelAddressField
+        : selectedHotelMeta?.address?.trim() || hotelAddressField;
     const preferredTransportValue = String(formData.get("preferredTransport") ?? "public_transit");
     const transportOther =
       preferredTransportValue === TRANSPORT_OTHER
@@ -158,7 +220,8 @@ export default function PlanPage() {
       preferredTransport: preferredTransportValue,
       transportOther,
       stayingHotel: staying,
-      hotelAddress: staying === HOTEL_OPTION_OTHER ? hotelAddress : "",
+      hotelAddress,
+      hotelPlaceId: staying !== HOTEL_OPTION_OTHER && staying !== HOTEL_OPTION_NA ? hotelPlaceId : undefined,
       accessibility,
       partySize,
       tripParty,
@@ -510,22 +573,40 @@ export default function PlanPage() {
           <select
             name="stayingHotel"
             value={stayingHotel}
-            onChange={(e) => setStayingHotel(e.target.value)}
+            onChange={(e) => {
+              const value = e.target.value;
+              setStayingHotel(value);
+              const picked = hotelOptions.find((h) => h.name === value) ?? null;
+              setSelectedHotelMeta(picked);
+            }}
             required
+            disabled={hotelsLoading && !hotelOptions.length}
             className="w-full max-w-xl px-3 py-2 outline-none"
             style={inputStyle}
           >
             <option value={HOTEL_OPTION_NA}>N/A — this is a day trip (no overnight hotel)</option>
             {hotelOptions.map((h) => (
-              <option key={h} value={h}>
-                {h}
+              <option key={h.placeId ?? h.name} value={h.name}>
+                {h.name}
+                {h.address ? ` · ${h.address.split(",")[0]}` : ""}
               </option>
             ))}
             <option value={HOTEL_OPTION_OTHER}>Other — my hotel is not listed (enter address below)</option>
           </select>
+          <input type="hidden" name="hotelPlaceId" value={selectedHotelMeta?.placeId ?? ""} />
+          {selectedHotelMeta?.address ? (
+            <input type="hidden" name="hotelAddress" value={selectedHotelMeta.address} />
+          ) : null}
           <p style={{ fontFamily: SERIF, fontSize: 14, color: INK3, marginTop: 0 }}>
-            Hotels shown are suggestions based on your destination. Pick &ldquo;Other&rdquo; if yours is not listed.
+            {hotelsLoading
+              ? "Loading hotels from Google Maps…"
+              : hotelsSource === "google"
+                ? "Hotel names verified with Google Places for your destination."
+                : "Hotels are suggestions for your destination. Enable Places API (New) for live Google names, or pick Other."}
           </p>
+          {hotelsMessage ? (
+            <p style={{ fontFamily: SERIF, fontSize: 13, color: INK2, marginTop: 4 }}>{hotelsMessage}</p>
+          ) : null}
           {stayingHotel === HOTEL_OPTION_OTHER ? (
             <label className="flex flex-col gap-2">
               <span style={labelCaps}>Hotel name &amp; address</span>

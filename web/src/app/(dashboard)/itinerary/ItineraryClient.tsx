@@ -11,6 +11,7 @@ import {
   formatAdjustedClockTime,
   itinerarySlotKey,
 } from "@/lib/itineraryScheduleDisplay";
+import { VenueGoogleBadges } from "@/components/itinerary/VenueGoogleBadges";
 import {
   normalizeItineraryDays,
   type GeneratedItinerary,
@@ -242,7 +243,25 @@ export default function ItineraryClient() {
         <p style={{ marginTop: 16, fontFamily: SERIF, fontSize: 16, lineHeight: 1.55, color: INK2 }}>
           {itinerary.summary}
         </p>
-        {itinerary.meta?.walkTimesVerifiedWithGoogle ? (
+        {itinerary.meta?.googleEnrichment?.placesApiError ? (
+          <p
+            style={{
+              marginTop: 12,
+              fontFamily: SERIF,
+              fontSize: 14,
+              lineHeight: 1.5,
+              color: "#9B2C2C",
+              maxWidth: 720,
+              padding: "10px 12px",
+              border: "1px solid #9B2C2C44",
+              background: "#FEE2E288",
+            }}
+          >
+            {itinerary.meta.googleEnrichment.placesApiError} Walk times may still show a{" "}
+            <strong>Google · walk time</strong> badge when Routes API succeeded.
+          </p>
+        ) : null}
+        {itinerary.meta?.googleEnrichment || itinerary.meta?.walkTimesVerifiedWithGoogle ? (
           <p
             style={{
               marginTop: 12,
@@ -254,9 +273,22 @@ export default function ItineraryClient() {
               maxWidth: 720,
             }}
           >
-            Walking times from your lodging and between some stops were double-checked with Google Directions
-            {itinerary.meta.googleWalkUpdates != null ? ` (${itinerary.meta.googleWalkUpdates} legs updated)` : ""}.
-            Driving or transit legs are unchanged; very dense city centers can still differ from real-time conditions.
+            Travel times were double-checked with Google Routes
+            {itinerary.meta.googleEnrichment?.routeUpdates != null
+              ? ` (${itinerary.meta.googleEnrichment.routeUpdates} legs)`
+              : itinerary.meta.googleWalkUpdates != null
+                ? ` (${itinerary.meta.googleWalkUpdates} legs)`
+                : ""}
+            .
+            {itinerary.meta.googleEnrichment?.placesMatched
+              ? ` Hours and open/closed checked for ${itinerary.meta.googleEnrichment.placesMatched} venues — see badges on cards below.`
+              : ""}
+            {itinerary.meta.googleEnrichment?.closedAtTimeWarnings
+              ? ` ${itinerary.meta.googleEnrichment.closedAtTimeWarnings} venue(s) may be closed at the scheduled time.`
+              : ""}
+            {itinerary.meta.googleEnrichment?.longTravelWarnings
+              ? ` ${itinerary.meta.googleEnrichment.longTravelWarnings} leg(s) exceed 1 hour without a strong-match exception.`
+              : ""}
           </p>
         ) : null}
       </div>
@@ -265,7 +297,9 @@ export default function ItineraryClient() {
         <p style={{ fontFamily: SERIF, fontSize: 14, lineHeight: 1.5, color: INK3, maxWidth: 720 }}>
           Where you see three venue cards (meals, cafés, bars, shops, clubs, and similar), pick one — the leg <em>before</em>{" "}
           and <em>after</em> that stop updates, and later clock times shift to stay consistent with those walk minutes.
-          Ratings are estimates (not live listings); confirm before you go.
+          When Google verification ran, walk minutes, ratings, hours, and open/closed hints on cards come from Google — still
+          confirm before you go. Routine travel should stay within about 1 hour unless a stop is a strong match for your
+          must-haves or interests (called out on that leg).
         </p>
         {itinerary.days.map((day) => (
           <section
@@ -477,6 +511,21 @@ function DayScheduleRow({
         {isTravel && travelMinutes != null && Number.isFinite(travelMinutes) ? (
           <div style={{ fontFamily: SERIF, fontSize: 13, color: INK2, marginTop: 6 }}>~{travelMinutes} min</div>
         ) : null}
+        {isTravel && row.googleRouteVerified ? (
+          <div
+            style={{
+              marginTop: 6,
+              fontFamily: SANS,
+              fontSize: 9,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              fontWeight: 700,
+              color: INK,
+            }}
+          >
+            Google · travel time
+          </div>
+        ) : null}
       </div>
       <div className="min-w-0">
         {isTravel ? (
@@ -505,6 +554,16 @@ function DayScheduleRow({
         </div>
         {row.detail ? (
           <p style={{ fontFamily: SERIF, fontSize: 14, lineHeight: 1.45, color: INK2, marginTop: 6 }}>{row.detail}</p>
+        ) : null}
+        {isTravel && row.travelTimeWarning ? (
+          <p style={{ fontFamily: SERIF, fontSize: 13, lineHeight: 1.45, color: "#9B2C2C", marginTop: 6 }}>
+            {row.travelTimeWarning}
+          </p>
+        ) : null}
+        {isTravel && row.longTravelAllowed && row.longTravelReason ? (
+          <p style={{ fontFamily: SERIF, fontSize: 13, lineHeight: 1.45, color: INK3, marginTop: 6 }}>
+            {row.longTravelReason}
+          </p>
         ) : null}
         {!isTravel && row.venueChoices?.length ? (
           <VenueChoiceGrid
@@ -556,6 +615,13 @@ function VenueChoiceGrid({
               {c.oneLine ? (
                 <p style={{ fontFamily: SERIF, fontSize: 14, lineHeight: 1.45, color: INK2, margin: 0 }}>{c.oneLine}</p>
               ) : null}
+              <VenueGoogleBadges choice={c} />
+              {c.longWalkWarning ? (
+                <p style={{ fontFamily: SERIF, fontSize: 13, lineHeight: 1.4, color: "#9B2C2C", margin: 0 }}>{c.longWalkWarning}</p>
+              ) : null}
+              {c.longWalkAllowed && c.longWalkReason ? (
+                <p style={{ fontFamily: SERIF, fontSize: 12, lineHeight: 1.4, color: INK3, margin: 0 }}>{c.longWalkReason}</p>
+              ) : null}
               <div style={{ fontFamily: SANS, fontSize: 10, letterSpacing: "0.12em", color: INK3, textTransform: "uppercase" }}>
                 {c.walkFromPreviousMinutes != null ? (
                   <span>From last stop ~{c.walkFromPreviousMinutes} min walk · </span>
@@ -563,7 +629,9 @@ function VenueChoiceGrid({
                 {c.rating != null ? (
                   <span>
                     {c.rating.toFixed(1)}★
-                    {c.ratingCountApprox != null ? ` · ~${c.ratingCountApprox} reviews` : ""}
+                    {c.ratingCountApprox != null
+                      ? ` · ${c.googleVerified ? "" : "~"}${c.ratingCountApprox} reviews`
+                      : ""}
                   </span>
                 ) : (
                   <span>Rating n/a</span>
