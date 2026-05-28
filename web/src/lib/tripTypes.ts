@@ -21,6 +21,25 @@ export interface ItineraryVenueChoice {
   /** Official site when known; otherwise omit or null (Maps search is still offered in UI). */
   websiteUrl?: string | null;
   oneLine?: string;
+  /** Set when Places API matched this venue during enrichment. */
+  googlePlaceId?: string;
+  /** Hours, rating, and open/closed came from Google Places. */
+  googleVerified?: boolean;
+  /** Walk minutes on this card were updated from Google Routes. */
+  googleWalkVerified?: boolean;
+  /** Google Places business status when known. */
+  businessStatus?: "OPERATIONAL" | "CLOSED_TEMPORARILY" | "CLOSED_PERMANENTLY";
+  /** Whether Google regular hours suggest the venue is open at the scheduled activity time. */
+  openAtScheduledTime?: boolean;
+  /** Short hours line from Google (e.g. weekday descriptions). */
+  hoursSummary?: string;
+  /** Warning when closed or hours could not be confirmed for the scheduled time. */
+  hoursNote?: string;
+  /** Walk leg to this venue exceeds 60 min but matches trip strongly. */
+  longWalkAllowed?: boolean;
+  longWalkReason?: string;
+  /** Walk leg exceeds 60 min without a strong-match exception. */
+  longWalkWarning?: string;
 }
 
 /** One row in the day schedule: either a stop or a move between stops. */
@@ -37,6 +56,13 @@ export interface ItineraryScheduleRow {
   mode?: string;
   /** Activity only: exactly three named venue alternatives when present. */
   venueChoices?: ItineraryVenueChoice[];
+  /** Travel only: leg exceeds 60 min but is allowed (logistics or strong match). */
+  longTravelAllowed?: boolean;
+  longTravelReason?: string;
+  /** Travel only: leg exceeds 60 min without an allowed exception. */
+  travelTimeWarning?: string;
+  /** Travel only: durationMinutes came from Google Routes. */
+  googleRouteVerified?: boolean;
 }
 
 export interface GeneratedItineraryDay {
@@ -56,6 +82,19 @@ export interface GeneratedItinerary {
     walkTimesVerifiedWithGoogle?: boolean;
     googleWalkAttempts?: number;
     googleWalkUpdates?: number;
+    /** Routes + Places enrichment summary (when GOOGLE_MAPS_API_KEY is set). */
+    googleEnrichment?: {
+      routeAttempts: number;
+      routeUpdates: number;
+      placesLookups: number;
+      placesMatched: number;
+      closedAtTimeWarnings: number;
+      usedLegacyDirectionsFallback?: number;
+      longTravelWarnings?: number;
+      longTravelExceptions?: number;
+      /** Set when Places lookups ran but none succeeded (often API not enabled). */
+      placesApiError?: string;
+    };
   };
 }
 
@@ -114,6 +153,10 @@ export function normalizeDayItems(items: unknown): ItineraryScheduleRow[] {
       mode,
       durationMinutes,
       venueChoices,
+      longTravelAllowed: o.longTravelAllowed === true,
+      longTravelReason: typeof o.longTravelReason === "string" ? o.longTravelReason.trim() : undefined,
+      travelTimeWarning: typeof o.travelTimeWarning === "string" ? o.travelTimeWarning.trim() : undefined,
+      googleRouteVerified: o.googleRouteVerified === true,
     });
   }
   return rows;
@@ -144,6 +187,13 @@ function normalizeVenueChoices(raw: unknown): ItineraryVenueChoice[] | undefined
       const u = o.websiteUrl.trim();
       websiteUrl = /^https?:\/\//i.test(u) ? u : null;
     }
+    const businessStatus = o.businessStatus;
+    const validStatus =
+      businessStatus === "OPERATIONAL" ||
+      businessStatus === "CLOSED_TEMPORARILY" ||
+      businessStatus === "CLOSED_PERMANENTLY"
+        ? businessStatus
+        : undefined;
     out.push({
       id,
       name,
@@ -154,6 +204,17 @@ function normalizeVenueChoices(raw: unknown): ItineraryVenueChoice[] | undefined
       ratingCountApprox: numOrUndef(o.ratingCountApprox),
       websiteUrl: websiteUrl === undefined ? undefined : websiteUrl,
       oneLine: typeof o.oneLine === "string" ? o.oneLine.trim() : undefined,
+      googlePlaceId: typeof o.googlePlaceId === "string" ? o.googlePlaceId : undefined,
+      googleVerified: o.googleVerified === true,
+      googleWalkVerified: o.googleWalkVerified === true,
+      businessStatus: validStatus,
+      openAtScheduledTime:
+        o.openAtScheduledTime === true ? true : o.openAtScheduledTime === false ? false : undefined,
+      hoursSummary: typeof o.hoursSummary === "string" ? o.hoursSummary.trim() : undefined,
+      hoursNote: typeof o.hoursNote === "string" ? o.hoursNote.trim() : undefined,
+      longWalkAllowed: o.longWalkAllowed === true,
+      longWalkReason: typeof o.longWalkReason === "string" ? o.longWalkReason.trim() : undefined,
+      longWalkWarning: typeof o.longWalkWarning === "string" ? o.longWalkWarning.trim() : undefined,
     });
     if (out.length >= 3) break;
   }

@@ -1,11 +1,12 @@
 "use client";
 
 import type { CSSProperties, FormEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { INK, INK2, INK3, OXBLOOD, PAPER, PAPER2, SANS, SERIF } from "@/components/landing/brand";
-import { HOTEL_OPTION_NA, HOTEL_OPTION_OTHER, hotelsForDestination } from "@/lib/demoHotels";
+import { HOTEL_OPTION_NA, HOTEL_OPTION_OTHER } from "@/lib/demoHotels";
+import HotelAutocomplete from "@/components/plan/HotelAutocomplete";
 import { RESULT_STORAGE_KEY, TRIP_META_STORAGE_KEY } from "@/lib/tripStorageKeys";
 import { normalizeItineraryDays, type GeneratedItinerary, type MustHaveCard } from "@/lib/tripTypes";
 
@@ -67,7 +68,6 @@ export default function PlanPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [destinationInput, setDestinationInput] = useState("");
-  const [stayingHotel, setStayingHotel] = useState<string>(HOTEL_OPTION_NA);
   const [preferredTransport, setPreferredTransport] = useState<string>("public_transit");
   const [tripPurpose, setTripPurpose] = useState<string>("vacation");
   const [flightBookingStatus, setFlightBookingStatus] = useState<string>(FLIGHT_NOT_BOOKED);
@@ -84,41 +84,6 @@ export default function PlanPage() {
   } | null>(null);
   const [groundTravelMode, setGroundTravelMode] = useState<string>("train");
   const [mustHaves, setMustHaves] = useState<MustHaveRow[]>([emptyMustHave()]);
-
-  const hotelOptions = useMemo(() => hotelsForDestination(destinationInput), [destinationInput]);
-
-  useEffect(() => {
-    if (flightBookingStatus !== FLIGHT_BOOKED) return;
-    if (!flightDate || !flightNumberInput.trim()) return;
-
-    setFlightLookupStatus("loading");
-    setResolvedFlight(null);
-
-    const timer = setTimeout(async () => {
-      try {
-        const res = await fetch(
-          `/api/flight-lookup?flightNumber=${encodeURIComponent(flightNumberInput.trim())}&date=${flightDate}`
-        );
-        const data = await res.json() as { found: boolean; origin?: string; destination?: string; departureScheduled?: string; arrivalScheduled?: string; airline?: string };
-        if (data.found) {
-          setResolvedFlight({
-            origin: data.origin ?? "",
-            destination: data.destination ?? "",
-            departureScheduled: data.departureScheduled ?? "",
-            arrivalScheduled: data.arrivalScheduled ?? "",
-            airline: data.airline ?? "",
-          });
-          setFlightLookupStatus("found");
-        } else {
-          setFlightLookupStatus("not_found");
-        }
-      } catch {
-        setFlightLookupStatus("error");
-      }
-    }, 900);
-
-    return () => clearTimeout(timer);
-  }, [flightDate, flightNumberInput, flightBookingStatus]);
 
   function updateMustHave(id: string, patch: Partial<MustHaveCard>) {
     setMustHaves((rows) => rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
@@ -160,8 +125,10 @@ export default function PlanPage() {
       }))
       .filter((c) => c.timeBlock || c.activity || c.where || c.details);
 
-    const hotelAddress = String(formData.get("hotelAddress") ?? "").trim();
+    const hotelAddressField = String(formData.get("hotelAddress") ?? "").trim();
+    const hotelPlaceId = String(formData.get("hotelPlaceId") ?? "").trim();
     const staying = String(formData.get("stayingHotel") ?? HOTEL_OPTION_NA);
+    const hotelAddress = hotelAddressField;
     const preferredTransportValue = String(formData.get("preferredTransport") ?? "public_transit");
     const transportOther =
       preferredTransportValue === TRANSPORT_OTHER
@@ -205,7 +172,8 @@ export default function PlanPage() {
       preferredTransport: preferredTransportValue,
       transportOther,
       stayingHotel: staying,
-      hotelAddress: staying === HOTEL_OPTION_OTHER ? hotelAddress : "",
+      hotelAddress,
+      hotelPlaceId: staying !== HOTEL_OPTION_OTHER && staying !== HOTEL_OPTION_NA ? hotelPlaceId : undefined,
       accessibility,
       partySize,
       tripParty,
@@ -561,41 +529,11 @@ export default function PlanPage() {
           </div>
         </div>
 
-        <div className="flex flex-col gap-3">
-          <span style={labelCaps}>Where you are staying</span>
-          <select
-            name="stayingHotel"
-            value={stayingHotel}
-            onChange={(e) => setStayingHotel(e.target.value)}
-            required
-            className="w-full max-w-xl px-3 py-2 outline-none"
-            style={inputStyle}
-          >
-            <option value={HOTEL_OPTION_NA}>N/A — this is a day trip (no overnight hotel)</option>
-            {hotelOptions.map((h) => (
-              <option key={h} value={h}>
-                {h}
-              </option>
-            ))}
-            <option value={HOTEL_OPTION_OTHER}>Other — my hotel is not listed (enter address below)</option>
-          </select>
-          <p style={{ fontFamily: SERIF, fontSize: 14, color: INK3, marginTop: 0 }}>
-            Hotels shown are suggestions based on your destination. Pick &ldquo;Other&rdquo; if yours is not listed.
-          </p>
-          {stayingHotel === HOTEL_OPTION_OTHER ? (
-            <label className="flex flex-col gap-2">
-              <span style={labelCaps}>Hotel name &amp; address</span>
-              <textarea
-                name="hotelAddress"
-                rows={3}
-                required
-                placeholder="Hotel name, street, city"
-                className="w-full px-3 py-2 outline-none"
-                style={inputStyle}
-              />
-            </label>
-          ) : null}
-        </div>
+        <HotelAutocomplete
+          destination={destinationInput}
+          inputStyle={inputStyle}
+          labelCaps={labelCaps}
+        />
 
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-end justify-between gap-3">

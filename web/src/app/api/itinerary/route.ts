@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { enrichItineraryWalksWithGoogle } from "@/lib/enrichItineraryWalksGoogle";
+import { HOTEL_OPTION_NA, HOTEL_OPTION_OTHER } from "@/lib/demoHotels";
+import { enrichItineraryWithGoogle } from "@/lib/enrichItineraryWithGoogle";
+import { resolveHotelLodging } from "@/lib/googleMaps/searchHotels";
+import { applyTravelTimeCapPolicy, travelTimeCapPromptRules } from "@/lib/travelTimePolicy";
 import type { MustHaveCard } from "@/lib/tripTypes";
 import { normalizeItineraryDays, type GeneratedItinerary } from "@/lib/tripTypes";
 
@@ -28,6 +31,7 @@ interface TripRequest {
   transportOther?: string;
   stayingHotel: string;
   hotelAddress?: string;
+  hotelPlaceId?: string;
   accessibility: boolean;
   partySize: number;
   tripParty: "friends" | "family" | "friends_and_family" | "myself";
@@ -66,6 +70,7 @@ export async function POST(request: Request) {
     transportOther: raw.transportOther,
     stayingHotel: String(raw.stayingHotel ?? "__day_trip__"),
     hotelAddress: raw.hotelAddress,
+    hotelPlaceId: typeof raw.hotelPlaceId === "string" ? raw.hotelPlaceId : undefined,
     accessibility: Boolean(raw.accessibility),
     partySize: typeof raw.partySize === "number" ? raw.partySize : Number(raw.partySize) || 1,
     tripParty:
@@ -77,6 +82,24 @@ export async function POST(request: Request) {
         : "friends_and_family",
     mustHaves: Array.isArray(raw.mustHaves) ? raw.mustHaves : [],
   };
+  const googleMapsKey = process.env.GOOGLE_MAPS_API_KEY?.trim();
+  if (
+    googleMapsKey &&
+    body.stayingHotel !== HOTEL_OPTION_NA &&
+    body.stayingHotel !== HOTEL_OPTION_OTHER
+  ) {
+    const resolved = await resolveHotelLodging(
+      body.stayingHotel,
+      body.destination,
+      googleMapsKey,
+      body.hotelPlaceId
+    );
+    if (resolved?.name) {
+      body.stayingHotel = resolved.name;
+      if (resolved.address) body.hotelAddress = resolved.address;
+    }
+  }
+
   const apiKey = process.env.OPENAI_API_KEY;
 
   if (!apiKey) {
@@ -137,23 +160,62 @@ export async function POST(request: Request) {
       days: normalizeItineraryDays(parsed.days),
     };
 
-    const googleKey = process.env.GOOGLE_MAPS_API_KEY?.trim();
+    const googleKey = googleMapsKey;
     if (googleKey) {
       try {
-        const { attempts, updates } = await enrichItineraryWalksWithGoogle(normalized, body, googleKey);
+        const stats = await enrichItineraryWithGoogle(
+          normalized,
+          {
+            destination: body.destination,
+            startDate: body.startDate,
+            stayingHotel: body.stayingHotel,
+            hotelAddress: body.hotelAddress,
+          },
+          googleKey
+        );
         normalized.meta = {
-          walkTimesVerifiedWithGoogle: updates > 0,
-          googleWalkAttempts: attempts,
-          googleWalkUpdates: updates,
+          ...normalized.meta,
+          walkTimesVerifiedWithGoogle: stats.routeUpdates > 0,
+          googleWalkAttempts: stats.routeAttempts,
+          googleWalkUpdates: stats.routeUpdates,
+          googleEnrichment: stats,
         };
       } catch {
         normalized.meta = {
+          ...normalized.meta,
           walkTimesVerifiedWithGoogle: false,
           googleWalkAttempts: 0,
           googleWalkUpdates: 0,
+          googleEnrichment: {
+            routeAttempts: 0,
+            routeUpdates: 0,
+            placesLookups: 0,
+            placesMatched: 0,
+            closedAtTimeWarnings: 0,
+          },
         };
       }
     }
+
+    const travelCap = applyTravelTimeCapPolicy(normalized, {
+      interests: body.interests,
+      mustHaves: body.mustHaves,
+      tripPurpose: body.tripPurpose,
+    });
+    normalized.meta = {
+      ...normalized.meta,
+      googleEnrichment: {
+        ...normalized.meta?.googleEnrichment,
+        routeAttempts: normalized.meta?.googleEnrichment?.routeAttempts ?? 0,
+        routeUpdates: normalized.meta?.googleEnrichment?.routeUpdates ?? 0,
+        placesLookups: normalized.meta?.googleEnrichment?.placesLookups ?? 0,
+        placesMatched: normalized.meta?.googleEnrichment?.placesMatched ?? 0,
+        closedAtTimeWarnings: normalized.meta?.googleEnrichment?.closedAtTimeWarnings ?? 0,
+        longTravelWarnings: travelCap.longTravelWarnings,
+        longTravelExceptions: travelCap.longTravelExceptions,
+        placesApiError: normalized.meta?.googleEnrichment?.placesApiError,
+      },
+    };
 
     return NextResponse.json(normalized);
   } catch {
@@ -275,8 +337,9 @@ function formatMustHaves(cards: MustHaveCard[]): string {
 
 function transportPlanningRules(input: TripRequest): string {
   const mode = input.preferredTransport;
-  const common =
-    'Each day must use the structured "items" array below: alternate **travel** legs (movement between stops) with **activity** blocks. The first item of a day may be travel (from hotel or arrival point) or an activity if the day starts in place. End each day on an **activity** when possible (e.g. dinner), not mid-transit.';
+  const common = `Each day must use the structured "items" array below: alternate **travel** legs (movement between stops) with **activity** blocks. The first item of a day may be travel (from hotel or arrival point) or an activity if the day starts in place. End each day on an **activity** when possible (e.g. dinner), not mid-transit.
+
+${travelTimeCapPromptRules()}`;
 
   const travelRowRules =
     'For every **travel** row: set "kind" to "travel", "time" to departure time (12-hour with AM/PM), "text" to a short description of the route (from → toward), "durationMinutes" to a realistic whole number of minutes for that mode, and "mode" to one of: walk, public_transit, taxi, car, bike, train, ferry, mixed.';
@@ -454,7 +517,7 @@ Item rules:
 - Keep activity "text" one or two tight sentences; avoid dumping whole paragraphs into one row.
 
 Venue options (any stop where a **specific real place** matters — user picks one of three):
-- When the server has **Google Maps** configured, walking **durationMinutes** and venue **walkFromPreviousMinutes** / **walkToFollowingStopMinutes** may be **replaced** with Google Directions walking durations for verification; still output your best initial estimates.
+- When the server has **Google Maps** configured, it will **re-check before returning**: Routes API for **durationMinutes** and walk/transit legs, Places API for **hours**, **open/closed at the scheduled time**, and **ratings**. Use **real venue names** and neighborhoods so Google can match them; still output your best initial estimates.
 - **Meals (mandatory venue cards):** Any activity that is **sit-down or destination eating** must include **venueChoices** (exactly 3 picks each). That includes **breakfast or sit-down morning coffee**, **brunch**, **lunch**, **afternoon tea or dessert at a named salon**, **dinner**, **supper / late bite**, **market or hall lunch**, **omakase or tasting menus**, **tapas / pintxos crawl anchors**, **street-food clusters as the main stop**, and **bakeries or pastry shops when that stop is the main event**. On every **full calendar day** of the trip, include **at least one** **lunch** activity with **venueChoices** and **at least one** **dinner** activity with **venueChoices**. When the day includes eating out in the morning, add **breakfast or brunch** with **venueChoices** too. Do **not** describe lunch or dinner only as "grab something nearby" or "find a local restaurant" without three named options — use cards even for quick lunch (counter ramen, bistro du quartier, food hall stall row) by naming three real-feeling spots. If **pace** is tight, choose faster formats but still three names per meal row.
 - Add **venueChoices** for other concrete venue types where names help: **cafés**, **wine or cocktail bars**, **pubs and breweries**, **nightclubs and late-night venues**, **live music rooms**, **shopping malls and major retail**, **neighborhood shopping streets**, **bookstores and specialty retail**, **spas** when venue-specific, and similar. Use judgment for non-meal stops: if the traveler would reasonably Google a business name, include venueChoices.
 - **Hotel / lodging names:** Always use the **lodging exact string** above character-for-character in prose and in travel rows (e.g. "Return to …"). Never replace it with a generic label like "your hotel" unless the traveler is on a day trip (N/A).
