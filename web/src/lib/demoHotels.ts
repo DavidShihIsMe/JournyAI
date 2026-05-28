@@ -71,3 +71,16 @@ export function hotelsForDestination(destination: string): string[] {
   }
   return [...GENERIC];
 }
+
+/** Match demo hotels by typed query (each word can match anywhere in the name). */
+export function filterHotelsByQuery(destination: string, query: string): string[] {
+  const list = hotelsForDestination(destination);
+  const q = query.trim().toLowerCase();
+  if (!q) return list;
+  const tokens = q.split(/\s+/).filter((t) => t.length > 0);
+  return list.filter((name) => {
+    const hay = name.toLowerCase();
+    if (hay.includes(q)) return true;
+    return tokens.every((token) => hay.includes(token));
+  });
+}

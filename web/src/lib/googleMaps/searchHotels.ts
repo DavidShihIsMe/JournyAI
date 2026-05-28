@@ -39,20 +39,27 @@ function isLodgingPlace(types: string[] | undefined): boolean {
   return types.some((t) => LODGING_TYPES.has(t) || t.includes("lodging") || t.includes("hotel"));
 }
 
-/**
- * Find real hotel names in a destination via Places API (New) text search.
- */
-export async function searchHotelsInDestination(
-  destination: string,
-  apiKey: string,
-  maxResults = 10
-): Promise<{ hotels: GoogleHotelResult[]; error?: string }> {
-  const dest = destination.trim();
-  if (!dest || !apiKey) {
-    return { hotels: [], error: "Missing destination or API key." };
+function parsePlacesHotelResults(data: SearchResponse, maxResults: number): GoogleHotelResult[] {
+  const hotels: GoogleHotelResult[] = [];
+  for (const place of data.places ?? []) {
+    const name = place.displayName?.text?.trim();
+    if (!name) continue;
+    if (!isLodgingPlace(place.types)) continue;
+    hotels.push({
+      name,
+      address: place.formattedAddress,
+      placeId: place.id,
+    });
+    if (hotels.length >= maxResults) break;
   }
+  return hotels;
+}
 
-  const textQuery = `hotels in ${dest}`;
+async function fetchHotelsFromPlaces(
+  textQuery: string,
+  apiKey: string,
+  maxResults: number
+): Promise<{ hotels: GoogleHotelResult[]; error?: string }> {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), 14_000);
 
@@ -74,22 +81,35 @@ export async function searchHotelsInDestination(
     });
 
     const data = (await res.json()) as SearchResponse & { error?: { message?: string } };
-    if (!res.ok) {
-      const msg = data.error?.message ?? `Places API HTTP ${res.status}`;
-      return { hotels: [], error: msg };
+    let hotels = parsePlacesHotelResults(data, maxResults);
+
+    if (!res.ok || hotels.length === 0) {
+      const retry = await fetch(SEARCH_TEXT_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": apiKey,
+          "X-Goog-FieldMask": HOTEL_FIELD_MASK,
+        },
+        body: JSON.stringify({
+          textQuery,
+          languageCode: "en",
+          maxResultCount: Math.min(20, Math.max(1, maxResults)),
+        }),
+        signal: controller.signal,
+      });
+      const retryData = (await retry.json()) as SearchResponse & { error?: { message?: string } };
+      if (retry.ok) {
+        hotels = parsePlacesHotelResults(retryData, maxResults);
+      } else if (!res.ok) {
+        const msg = retryData.error?.message ?? data.error?.message ?? `Places API HTTP ${res.status}`;
+        return { hotels: [], error: msg };
+      }
     }
 
-    const hotels: GoogleHotelResult[] = [];
-    for (const place of data.places ?? []) {
-      const name = place.displayName?.text?.trim();
-      if (!name) continue;
-      if (!isLodgingPlace(place.types)) continue;
-      hotels.push({
-        name,
-        address: place.formattedAddress,
-        placeId: place.id,
-      });
-      if (hotels.length >= maxResults) break;
+    if (!res.ok && hotels.length === 0) {
+      const msg = data.error?.message ?? `Places API HTTP ${res.status}`;
+      return { hotels: [], error: msg };
     }
 
     return { hotels };
@@ -98,6 +118,41 @@ export async function searchHotelsInDestination(
   } finally {
     clearTimeout(t);
   }
+}
+
+/**
+ * Find real hotel names in a destination via Places API (New) text search.
+ */
+export async function searchHotelsInDestination(
+  destination: string,
+  apiKey: string,
+  maxResults = 10
+): Promise<{ hotels: GoogleHotelResult[]; error?: string }> {
+  const dest = destination.trim();
+  if (!dest || !apiKey) {
+    return { hotels: [], error: "Missing destination or API key." };
+  }
+  return fetchHotelsFromPlaces(`hotels in ${dest}`, apiKey, maxResults);
+}
+
+/**
+ * Typeahead: match hotels as the user types (name + destination).
+ */
+export async function searchHotelsByQuery(
+  destination: string,
+  query: string,
+  apiKey: string,
+  maxResults = 8
+): Promise<{ hotels: GoogleHotelResult[]; error?: string }> {
+  const dest = destination.trim();
+  const q = query.trim();
+  if (!dest || !apiKey) {
+    return { hotels: [], error: "Missing destination or API key." };
+  }
+  if (!q) {
+    return searchHotelsInDestination(dest, apiKey, maxResults);
+  }
+  return fetchHotelsFromPlaces(`${q} hotel ${dest}`, apiKey, maxResults);
 }
 
 /**

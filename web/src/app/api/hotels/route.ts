@@ -1,27 +1,33 @@
 import { NextResponse } from "next/server";
-import { hotelsForDestination } from "@/lib/demoHotels";
+import { filterHotelsByQuery } from "@/lib/demoHotels";
 import type { HotelOption } from "@/lib/hotelTypes";
-import { searchHotelsInDestination } from "@/lib/googleMaps/searchHotels";
+import { searchHotelsByQuery } from "@/lib/googleMaps/searchHotels";
+
+function fallbackOptions(destination: string, query: string): HotelOption[] {
+  return filterHotelsByQuery(destination, query).map((name) => ({ name }));
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const destination = searchParams.get("destination")?.trim() ?? "";
+  const query = searchParams.get("q")?.trim() ?? "";
 
   if (!destination) {
     return NextResponse.json({ hotels: [] as HotelOption[], source: "empty" });
   }
 
   const apiKey = process.env.GOOGLE_MAPS_API_KEY?.trim();
+  const fallback = fallbackOptions(destination, query);
+
   if (!apiKey) {
-    const fallback = hotelsForDestination(destination).map((name) => ({ name }));
     return NextResponse.json({
       hotels: fallback,
       source: "fallback",
-      message: "GOOGLE_MAPS_API_KEY not set — using built-in hotel suggestions.",
+      message: "GOOGLE_MAPS_API_KEY not set — showing built-in hotel suggestions.",
     });
   }
 
-  const { hotels, error } = await searchHotelsInDestination(destination, apiKey);
+  const { hotels, error } = await searchHotelsByQuery(destination, query, apiKey);
 
   if (hotels.length > 0) {
     const options: HotelOption[] = hotels.map((h) => ({
@@ -33,12 +39,19 @@ export async function GET(request: Request) {
     return NextResponse.json({ hotels: options, source: "google" });
   }
 
-  const fallback = hotelsForDestination(destination).map((name) => ({ name }));
+  const placesBlocked =
+    error?.includes("PERMISSION_DENIED") ||
+    error?.includes("SERVICE_BLOCKED") ||
+    error?.includes("not enabled") ||
+    error?.includes("blocked");
+
   return NextResponse.json({
     hotels: fallback,
     source: "fallback",
-    message:
-      error ??
-      "Google returned no hotels for this destination — using built-in suggestions. Enable Places API (New) for live names.",
+    message: placesBlocked
+      ? "Google Places isn’t enabled on your API key yet — showing built-in hotels for your destination. Enable Places API (New) in Google Cloud for live search as you type."
+      : fallback.length
+        ? "Showing built-in hotel suggestions for your destination."
+        : (error ?? "No matches — try another spelling or use manual entry below."),
   });
 }
