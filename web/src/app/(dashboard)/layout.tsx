@@ -1,4 +1,5 @@
 import DashboardNav from "@/components/DashboardNav";
+import QuizSyncOnAuth from "@/components/QuizSyncOnAuth";
 import { INK, PAPER } from "@/components/landing/brand";
 
 export default function DashboardLayout({
@@ -11,6 +12,7 @@ export default function DashboardLayout({
       className="journy-root journy-paper-texture flex w-full min-h-dvh flex-col md:flex-row"
       style={{ background: PAPER, color: INK }}
     >
+      <QuizSyncOnAuth />
       <DashboardNav />
       <main
         className="flex min-h-0 flex-1 flex-col pb-[calc(4rem+env(safe-area-inset-bottom,0px))] md:min-h-dvh md:pb-0"

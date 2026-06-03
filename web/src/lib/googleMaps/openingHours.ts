@@ -17,16 +17,22 @@ function toWeekMinutes(day: number, hour: number, minute: number): number {
 /**
  * Returns whether the place is open at `when` per regularOpeningHours.periods,
  * or null when hours are unknown.
+ *
+ * Includes a ±toleranceMinutes window to absorb timezone skew between the
+ * server's local time (used to build `when`) and the destination's local time —
+ * cheaper than per-place tz lookups and good enough for hours-aware planning.
  */
 export function isOpenAtScheduledTime(
   regularOpeningHours: GoogleRegularHours | undefined,
-  when: Date
+  when: Date,
+  toleranceMinutes = 60
 ): boolean | null {
   const periods = regularOpeningHours?.periods;
   if (!periods?.length) return null;
 
   const day = when.getDay();
   const target = toWeekMinutes(day, when.getHours(), when.getMinutes());
+  const tol = Math.max(0, toleranceMinutes);
 
   for (const period of periods) {
     const o = period.open;
@@ -39,7 +45,7 @@ export function isOpenAtScheduledTime(
 
     let check = target;
     if (check < openM - 2 * 24 * 60) check += 7 * 24 * 60;
-    if (check >= openM && check < closeM) return true;
+    if (check >= openM - tol && check < closeM + tol) return true;
   }
 
   return false;

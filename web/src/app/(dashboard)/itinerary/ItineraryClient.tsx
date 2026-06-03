@@ -1,10 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { INK, INK2, INK3, PAPER, PAPER2, SANS, SERIF } from "@/components/landing/brand";
-import { RESULT_STORAGE_KEY, SAVED_TRIPS_STORAGE_KEY, TRIP_META_STORAGE_KEY } from "@/lib/tripStorageKeys";
 import {
   displayTimeOffsetMinutes,
   effectiveTravelMinutes,
@@ -12,15 +11,15 @@ import {
   itinerarySlotKey,
 } from "@/lib/itineraryScheduleDisplay";
 import { VenueChoiceGrid } from "@/components/itinerary/VenueChoiceGrid";
-import { loadItineraryUiState, saveItineraryUiState } from "@/lib/itineraryUiState";
+import { supabase } from "@/lib/supabase";
 import {
   normalizeItineraryDays,
   type GeneratedItinerary,
   type GeneratedItineraryDay,
   type ItineraryScheduleRow,
   type ItineraryVenueChoice,
-  type SavedTrip,
 } from "@/lib/tripTypes";
+import { getTrip, updateTripUiState } from "@lib/services/trips";
 
 function mapsSearchUrl(placeName: string, destination: string): string {
   const q = `${placeName}, ${destination}`.trim();
@@ -29,63 +28,48 @@ function mapsSearchUrl(placeName: string, destination: string): string {
 
 export default function ItineraryClient() {
   const searchParams = useSearchParams();
+  const tripId = searchParams.get("tripId");
   const [itinerary, setItinerary] = useState<GeneratedItinerary | null>(null);
-  const [saveMessage, setSaveMessage] = useState<string>("");
   const [venueSelections, setVenueSelections] = useState<Record<string, string>>({});
   const [travelOverrides, setTravelOverrides] = useState<Record<string, number>>({});
+  const hydratedRef = useRef(false);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const tripId = searchParams.get("tripId");
-
-    if (tripId) {
-      const savedRaw = window.localStorage.getItem(SAVED_TRIPS_STORAGE_KEY);
-      if (!savedRaw) {
-        setItinerary(null);
-        return;
-      }
-      try {
-        const savedTrips = JSON.parse(savedRaw) as SavedTrip[];
-        const selectedTrip = savedTrips.find((trip) => trip.id === tripId);
-        if (!selectedTrip) {
-          setItinerary(null);
-          return;
-        }
-        setItinerary({
-          ...selectedTrip,
-          days: normalizeItineraryDays(selectedTrip.days),
-        });
-        return;
-      } catch {
-        setItinerary(null);
-        return;
-      }
-    }
-
-    const latestRaw = window.sessionStorage.getItem(RESULT_STORAGE_KEY);
-    if (!latestRaw) {
+    hydratedRef.current = false;
+    if (!tripId) {
       setItinerary(null);
       return;
     }
-    try {
-      const parsed = JSON.parse(latestRaw) as GeneratedItinerary;
-      setItinerary({ ...parsed, days: normalizeItineraryDays(parsed.days) });
-    } catch {
-      setItinerary(null);
-    }
-  }, [searchParams]);
+    let cancelled = false;
+    void (async () => {
+      const { data, error } = await getTrip(supabase, tripId);
+      if (cancelled) return;
+      if (error || !data) {
+        setItinerary(null);
+        return;
+      }
+      const raw = (data.data ?? {}) as GeneratedItinerary;
+      setItinerary({ ...raw, days: normalizeItineraryDays(raw.days) });
+      const ui = (data.ui_state ?? {}) as {
+        venueSelections?: Record<string, string>;
+        travelOverrides?: Record<string, number>;
+      };
+      setVenueSelections(ui.venueSelections ?? {});
+      setTravelOverrides(ui.travelOverrides ?? {});
+      hydratedRef.current = true;
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tripId]);
 
   useEffect(() => {
-    if (!itinerary) return;
-    const ui = loadItineraryUiState();
-    setVenueSelections(ui.venueSelections);
-    setTravelOverrides(ui.travelOverrides);
-  }, [itinerary?.title, itinerary?.travelDates]);
-
-  useEffect(() => {
-    if (!itinerary) return;
-    saveItineraryUiState({ venueSelections, travelOverrides });
-  }, [venueSelections, travelOverrides, itinerary]);
+    if (!hydratedRef.current || !tripId) return;
+    const handle = setTimeout(() => {
+      void updateTripUiState(supabase, tripId, { venueSelections, travelOverrides });
+    }, 500);
+    return () => clearTimeout(handle);
+  }, [venueSelections, travelOverrides, tripId]);
 
   const handleVenueSelect = useCallback((day: GeneratedItineraryDay, activityIndex: number, choice: ItineraryVenueChoice) => {
     const slot = itinerarySlotKey(day.day, activityIndex);
@@ -107,31 +91,6 @@ export default function ItineraryClient() {
       return next;
     });
   }, []);
-
-  function handleSaveToProfile() {
-    if (!itinerary || typeof window === "undefined") return;
-    let meta: { startDateIso?: string; endDateIso?: string } = {};
-    try {
-      const rawMeta = window.sessionStorage.getItem(TRIP_META_STORAGE_KEY);
-      if (rawMeta) meta = JSON.parse(rawMeta) as typeof meta;
-    } catch {
-      meta = {};
-    }
-
-    const savedTrip: SavedTrip = {
-      ...itinerary,
-      id: crypto.randomUUID(),
-      savedAt: new Date().toISOString(),
-      endDateIso: meta.endDateIso,
-      startDateIso: meta.startDateIso,
-    };
-
-    const raw = window.localStorage.getItem(SAVED_TRIPS_STORAGE_KEY);
-    const existing = raw ? (JSON.parse(raw) as SavedTrip[]) : [];
-    const next = [savedTrip, ...existing];
-    window.localStorage.setItem(SAVED_TRIPS_STORAGE_KEY, JSON.stringify(next));
-    setSaveMessage("Saved to profile.");
-  }
 
   function handleDownloadPdf() {
     if (!itinerary || typeof window === "undefined") return;
@@ -343,8 +302,8 @@ export default function ItineraryClient() {
         <div className="flex items-center gap-4 pt-3 flex-wrap">
           <Link
             href={
-              searchParams.get("tripId")
-                ? `/itinerary/calendar?tripId=${encodeURIComponent(searchParams.get("tripId")!)}`
+              tripId
+                ? `/itinerary/calendar?tripId=${encodeURIComponent(tripId)}`
                 : "/itinerary/calendar"
             }
             className="inline-flex items-center px-4 py-2"
@@ -377,24 +336,7 @@ export default function ItineraryClient() {
               fontWeight: 600,
             }}
           >
-            Download PDF
-          </button>
-          <button
-            type="button"
-            onClick={handleSaveToProfile}
-            className="inline-flex items-center px-4 py-2"
-            style={{
-              border: `1.5px solid ${INK}`,
-              background: INK,
-              color: PAPER,
-              fontFamily: SANS,
-              fontSize: 11,
-              letterSpacing: "0.18em",
-              textTransform: "uppercase",
-              fontWeight: 600,
-            }}
-          >
-            Save to profile
+            Print to PDF
           </button>
           <Link
             href="/plan"
@@ -415,9 +357,6 @@ export default function ItineraryClient() {
           <Link href="/profile" style={{ fontFamily: SERIF, fontSize: 15, color: INK2 }}>
             Back to profile &rarr;
           </Link>
-          {saveMessage ? (
-            <span style={{ fontFamily: SERIF, fontSize: 15, color: INK2 }}>{saveMessage}</span>
-          ) : null}
         </div>
       </div>
     </div>

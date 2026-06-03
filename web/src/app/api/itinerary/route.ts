@@ -1,10 +1,21 @@
 import { NextResponse } from "next/server";
+import { Agent } from "undici";
 import { HOTEL_OPTION_NA, HOTEL_OPTION_OTHER } from "@/lib/demoHotels";
 import { enrichItineraryWithGoogle } from "@/lib/enrichItineraryWithGoogle";
 import { resolveHotelLodging } from "@/lib/googleMaps/searchHotels";
+import { createServerSupabase } from "@/lib/supabase-server";
 import { applyTravelTimeCapPolicy, travelTimeCapPromptRules } from "@/lib/travelTimePolicy";
 import type { MustHaveCard } from "@/lib/tripTypes";
 import { normalizeItineraryDays, type GeneratedItinerary } from "@/lib/tripTypes";
+import { saveTrip } from "@lib/services/trips";
+
+// Anthropic non-streaming responses for long itineraries can take 5+ minutes —
+// the default undici headersTimeout (5 min) kills the connection before
+// Anthropic finishes generating. Use a generous 15 min ceiling.
+const longTimeoutAgent = new Agent({
+  headersTimeout: 15 * 60 * 1000,
+  bodyTimeout: 15 * 60 * 1000,
+});
 
 interface TripRequest {
   destination: string;
@@ -33,12 +44,37 @@ interface TripRequest {
   hotelAddress?: string;
   hotelPlaceId?: string;
   accessibility: boolean;
+  accessibilityNotes?: string;
   partySize: number;
   tripParty: "friends" | "family" | "friends_and_family" | "myself";
   mustHaves: MustHaveCard[];
 }
 
 export async function POST(request: Request) {
+  try {
+    return await handlePost(request);
+  } catch (err) {
+    console.error("[itinerary] unhandled exception:", err);
+    return NextResponse.json(
+      {
+        error: "Itinerary route crashed",
+        details: err instanceof Error ? err.message : String(err),
+      },
+      { status: 500 }
+    );
+  }
+}
+
+async function handlePost(request: Request) {
+  const supabase = await createServerSupabase();
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
   const raw = (await request.json()) as Partial<TripRequest>;
   const body: TripRequest = {
     destination: String(raw.destination ?? ""),
@@ -72,6 +108,7 @@ export async function POST(request: Request) {
     hotelAddress: raw.hotelAddress,
     hotelPlaceId: typeof raw.hotelPlaceId === "string" ? raw.hotelPlaceId : undefined,
     accessibility: Boolean(raw.accessibility),
+    accessibilityNotes: typeof raw.accessibilityNotes === "string" ? raw.accessibilityNotes : "",
     partySize: typeof raw.partySize === "number" ? raw.partySize : Number(raw.partySize) || 1,
     tripParty:
       raw.tripParty === "friends" ||
@@ -82,59 +119,84 @@ export async function POST(request: Request) {
         : "friends_and_family",
     mustHaves: Array.isArray(raw.mustHaves) ? raw.mustHaves : [],
   };
+
+  if (!body.destination.trim() || !body.startDate || !body.endDate) {
+    return NextResponse.json(
+      { error: "destination, startDate, and endDate are required" },
+      { status: 400 }
+    );
+  }
+  if (new Date(body.endDate) < new Date(body.startDate)) {
+    return NextResponse.json(
+      { error: "End date must be on or after start date." },
+      { status: 400 }
+    );
+  }
+  if (body.partySize < 1 || body.partySize > 20) {
+    return NextResponse.json(
+      { error: "Party size must be between 1 and 20." },
+      { status: 400 }
+    );
+  }
+
   const googleMapsKey = process.env.GOOGLE_MAPS_API_KEY?.trim();
   if (
     googleMapsKey &&
     body.stayingHotel !== HOTEL_OPTION_NA &&
     body.stayingHotel !== HOTEL_OPTION_OTHER
   ) {
-    const resolved = await resolveHotelLodging(
-      body.stayingHotel,
-      body.destination,
-      googleMapsKey,
-      body.hotelPlaceId
-    );
-    if (resolved?.name) {
-      body.stayingHotel = resolved.name;
-      if (resolved.address) body.hotelAddress = resolved.address;
+    try {
+      const resolved = await resolveHotelLodging(
+        body.stayingHotel,
+        body.destination,
+        googleMapsKey,
+        body.hotelPlaceId
+      );
+      if (resolved?.name) {
+        body.stayingHotel = resolved.name;
+        if (resolved.address) body.hotelAddress = resolved.address;
+      }
+    } catch (err) {
+      console.error("[itinerary] resolveHotelLodging threw — continuing without canonical hotel", err);
     }
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.ANTHROPIC_API_KEY;
 
   if (!apiKey) {
     return NextResponse.json(
-      { error: "Missing OPENAI_API_KEY. Add it to web/.env.local." },
+      { error: "Missing ANTHROPIC_API_KEY. Add it to web/.env.local." },
       { status: 500 }
     );
   }
 
   const prompt = buildPrompt(body);
-  const model = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
+  const model = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6";
 
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
+    // @ts-expect-error — undici-specific option, not in the standard fetch signature
+    dispatcher: longTimeoutAgent,
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
       model,
+      // Claude Sonnet 4.6 supports up to 64K output. 32K covers multi-week trips
+      // at the prompt's verbosity (3 venue choices per meal). Bump if 30+ day trips truncate.
+      max_tokens: 32000,
       temperature: 0.7,
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are an expert travel planner. Always return valid JSON matching the requested schema exactly.",
-        },
-        { role: "user", content: prompt },
-      ],
+      system:
+        "You are an expert travel planner. Always return valid JSON matching the requested schema exactly. Output ONLY the JSON object — no prose before or after, no markdown code fences. Start the response with '{' and end with '}'.",
+      messages: [{ role: "user", content: prompt }],
     }),
   });
 
   if (!response.ok) {
     const errorText = await response.text();
+    console.error("[itinerary] Anthropic API error", response.status, errorText);
     return NextResponse.json(
       { error: "Failed to generate itinerary", details: errorText },
       { status: 500 }
@@ -142,13 +204,26 @@ export async function POST(request: Request) {
   }
 
   const data = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
+    content?: Array<{ type: string; text?: string }>;
   };
 
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) {
+  const textBlock = data.content?.find((b) => b.type === "text")?.text;
+  if (!textBlock) {
     return NextResponse.json({ error: "AI returned an empty response." }, { status: 500 });
   }
+  // Strip markdown fences and any prose before the first { / after the last } in case the model wraps the JSON.
+  const content = (() => {
+    let s = textBlock.trim();
+    if (s.startsWith("```")) {
+      s = s.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
+    }
+    const first = s.indexOf("{");
+    const last = s.lastIndexOf("}");
+    if (first > 0 || (last >= 0 && last < s.length - 1)) {
+      if (first >= 0 && last > first) s = s.slice(first, last + 1);
+    }
+    return s;
+  })();
 
   try {
     const parsed = JSON.parse(content) as GeneratedItinerary;
@@ -217,8 +292,24 @@ export async function POST(request: Request) {
       },
     };
 
-    return NextResponse.json(normalized);
-  } catch {
+    const { data: savedTrip, error: saveError } = await saveTrip(supabase, user.id, {
+      title: normalized.title,
+      destination: body.destination,
+      start_date: body.startDate || null,
+      end_date: body.endDate || null,
+      data: normalized,
+    });
+    if (saveError || !savedTrip) {
+      console.error("[itinerary] saveTrip failed", saveError);
+      return NextResponse.json(
+        { error: "Failed to save trip", details: saveError?.message },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ tripId: savedTrip.id, itinerary: normalized });
+  } catch (err) {
+    console.error("[itinerary] JSON parse / shape error", err, "raw content (first 400 chars):", content.slice(0, 400));
     return NextResponse.json(
       {
         error: "AI response could not be parsed as itinerary JSON.",
@@ -428,7 +519,7 @@ Traveler Input:
 - Travel Pace: ${input.travelPace}
 - Interests: ${input.interests}
 - Preferred transportation: ${formatTransport(input)}
-- Accessibility needs: ${input.accessibility ? "Yes — prioritize step-free routes, shorter walks, clear rest breaks, and venues with good access." : "No specific accessibility requirements stated."}
+- Accessibility needs: ${input.accessibility ? (input.accessibilityNotes?.trim() ? `Yes — ${input.accessibilityNotes.trim()}. Honor each item when picking routes, venues, and pacing.` : "Yes — prioritize step-free routes, shorter walks, clear rest breaks, and venues with good access.") : "No specific accessibility requirements stated."}
 - Group: ${input.partySize} traveler(s); ${party}.
 
 Must-haves (hard commitments — schedule around these):

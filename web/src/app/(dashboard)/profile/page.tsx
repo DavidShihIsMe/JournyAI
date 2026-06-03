@@ -3,22 +3,57 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { INK, INK2, INK3, PAPER, PAPER2, SANS, SERIF } from "@/components/landing/brand";
-import { SAVED_TRIPS_STORAGE_KEY } from "@/lib/tripStorageKeys";
-import { type SavedTrip, tripIsPast } from "@/lib/tripTypes";
+import { supabase } from "@/lib/supabase";
+import { type GeneratedItinerary, tripIsPast } from "@/lib/tripTypes";
+import { deleteTrip as deleteTripRow, getTrips, type Trip } from "@lib/services/trips";
+
+interface TripCardRow {
+  id: string;
+  title: string;
+  destination: string;
+  travelDates: string;
+  summary: string;
+  endDateIso?: string;
+}
+
+function toCard(trip: Trip): TripCardRow {
+  const data = (trip.data ?? {}) as Partial<GeneratedItinerary>;
+  return {
+    id: trip.id,
+    title: data.title || trip.title,
+    destination: data.destination || trip.destination,
+    travelDates: data.travelDates ?? "",
+    summary: data.summary ?? "",
+    endDateIso: trip.end_date ?? undefined,
+  };
+}
 
 export default function ProfilePage() {
-  const [savedTrips, setSavedTrips] = useState<SavedTrip[]>([]);
+  const [savedTrips, setSavedTrips] = useState<TripCardRow[]>([]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const raw = window.localStorage.getItem(SAVED_TRIPS_STORAGE_KEY);
-    const parsed = raw ? (JSON.parse(raw) as SavedTrip[]) : [];
-    setSavedTrips(parsed);
+    let cancelled = false;
+    void (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (cancelled) return;
+      if (!user) {
+        setSavedTrips([]);
+        return;
+      }
+      const { data } = await getTrips(supabase, user.id);
+      if (cancelled) return;
+      setSavedTrips(data.map(toCard));
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const { plannedTrips, pastTrips } = useMemo(() => {
-    const past: SavedTrip[] = [];
-    const planned: SavedTrip[] = [];
+    const past: TripCardRow[] = [];
+    const planned: TripCardRow[] = [];
     for (const trip of savedTrips) {
       if (tripIsPast(trip.endDateIso)) past.push(trip);
       else planned.push(trip);
@@ -26,13 +61,9 @@ export default function ProfilePage() {
     return { plannedTrips: planned, pastTrips: past };
   }, [savedTrips]);
 
-  function deleteTrip(tripId: string) {
-    if (typeof window === "undefined") return;
-    setSavedTrips((prev) => {
-      const next = prev.filter((t) => t.id !== tripId);
-      window.localStorage.setItem(SAVED_TRIPS_STORAGE_KEY, JSON.stringify(next));
-      return next;
-    });
+  async function deleteTrip(tripId: string) {
+    setSavedTrips((prev) => prev.filter((t) => t.id !== tripId));
+    await deleteTripRow(supabase, tripId);
   }
 
   return (
@@ -86,11 +117,11 @@ export default function ProfilePage() {
       <div className="mx-6 p-6" style={{ border: `1px solid ${INK3}`, background: `${PAPER2}99` }}>
         <h2 style={{ fontFamily: SERIF, fontSize: 28, color: INK }}>Planned Trips</h2>
         <p style={{ marginTop: 6, fontFamily: SERIF, fontSize: 14, color: INK3 }}>
-          Trips that have not ended yet (or trips saved before we stored dates — shown here).
+          Trips with an end date in the future (or no end date stored).
         </p>
         {plannedTrips.length === 0 ? (
           <p style={{ marginTop: 12, fontFamily: SERIF, fontSize: 16, color: INK2 }}>
-            No planned trips yet. Generate an itinerary and click &ldquo;Save to profile.&rdquo;
+            No planned trips yet. Generate a new itinerary from the Plan page.
           </p>
         ) : (
           <div className="mt-4 flex flex-col gap-3">
@@ -104,7 +135,7 @@ export default function ProfilePage() {
       <div className="mx-6 p-6" style={{ border: `1px solid ${INK3}`, background: `${PAPER2}99` }}>
         <h2 style={{ fontFamily: SERIF, fontSize: 28, color: INK }}>Past Trips</h2>
         <p style={{ marginTop: 6, fontFamily: SERIF, fontSize: 14, color: INK3 }}>
-          Trips whose end date is before today (requires saving after a new plan so dates are stored).
+          Trips whose end date is before today.
         </p>
         {pastTrips.length === 0 ? (
           <p style={{ marginTop: 12, fontFamily: SERIF, fontSize: 16, color: INK2 }}>No past trips yet.</p>
@@ -146,7 +177,7 @@ export default function ProfilePage() {
   );
 }
 
-function TripCard({ trip, onDelete }: { trip: SavedTrip; onDelete: (id: string) => void }) {
+function TripCard({ trip, onDelete }: { trip: TripCardRow; onDelete: (id: string) => void }) {
   function handleDelete() {
     if (
       typeof window !== "undefined" &&
@@ -164,9 +195,12 @@ function TripCard({ trip, onDelete }: { trip: SavedTrip; onDelete: (id: string) 
       <div className="min-w-0 flex-1">
         <p style={{ fontFamily: SERIF, fontSize: 20, color: INK }}>{trip.title}</p>
         <p style={{ marginTop: 4, fontFamily: SERIF, fontSize: 15, color: INK2 }}>
-          {trip.destination} - {trip.travelDates}
+          {trip.destination}
+          {trip.travelDates ? ` - ${trip.travelDates}` : ""}
         </p>
-        <p style={{ marginTop: 8, fontFamily: SERIF, fontSize: 15, color: INK2 }}>{trip.summary}</p>
+        {trip.summary ? (
+          <p style={{ marginTop: 8, fontFamily: SERIF, fontSize: 15, color: INK2 }}>{trip.summary}</p>
+        ) : null}
       </div>
       <div className="flex flex-wrap items-center gap-2 shrink-0">
         <Link

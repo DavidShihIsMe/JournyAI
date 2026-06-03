@@ -66,7 +66,9 @@ export default function RootLayout({
       lang="en"
       className={`${playfairDisplay.variable} ${lora.variable} ${fraunces.variable} ${inter.variable} ${dmMono.variable} min-h-dvh`}
     >
-      <body className="flex min-h-dvh flex-col antialiased">{children}</body>
+      <body className="flex min-h-dvh flex-col antialiased" suppressHydrationWarning>
+        {children}
+      </body>
     </html>
   );
 }

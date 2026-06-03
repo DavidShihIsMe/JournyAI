@@ -1,108 +1,82 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import CalendarBlockModal from "@/components/itinerary/CalendarBlockModal";
 import WeekCalendarGrid from "@/components/itinerary/WeekCalendarGrid";
 import { INK, INK2, INK3, PAPER, PAPER2, SANS, SERIF } from "@/components/landing/brand";
 import { itinerarySlotKey } from "@/lib/itineraryScheduleDisplay";
-import { loadItineraryUiState, saveItineraryUiState } from "@/lib/itineraryUiState";
 import {
   buildCalendarColumns,
   setBlockStartTimeOnly,
   updateTravelRow,
 } from "@/lib/weekCalendarLayout";
-import {
-  RESULT_STORAGE_KEY,
-  SAVED_TRIPS_STORAGE_KEY,
-  TRIP_META_STORAGE_KEY,
-} from "@/lib/tripStorageKeys";
+import { supabase } from "@/lib/supabase";
 import {
   normalizeItineraryDays,
   type GeneratedItinerary,
   type GeneratedItineraryDay,
   type ItineraryVenueChoice,
-  type SavedTrip,
 } from "@/lib/tripTypes";
+import { getTrip, updateTripData, updateTripUiState } from "@lib/services/trips";
 
 export default function CalendarItineraryClient() {
   const searchParams = useSearchParams();
+  const tripId = searchParams.get("tripId");
   const [itinerary, setItinerary] = useState<GeneratedItinerary | null>(null);
   const [venueSelections, setVenueSelections] = useState<Record<string, string>>({});
   const [travelOverrides, setTravelOverrides] = useState<Record<string, number>>({});
   const [startDateIso, setStartDateIso] = useState<string | undefined>();
   const [modalDayIndex, setModalDayIndex] = useState<number | null>(null);
   const [modalRowIndex, setModalRowIndex] = useState<number | null>(null);
-  const [saveMessage, setSaveMessage] = useState("");
-
-  const persistItinerary = useCallback((next: GeneratedItinerary) => {
-    if (typeof window === "undefined") return;
-    window.sessionStorage.setItem(RESULT_STORAGE_KEY, JSON.stringify(next));
-  }, []);
-
-  const persistUi = useCallback(
-    (venue: Record<string, string>, travel: Record<string, number>) => {
-      saveItineraryUiState({ venueSelections: venue, travelOverrides: travel });
-    },
-    []
-  );
+  const hydratedRef = useRef(false);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const ui = loadItineraryUiState();
-    setVenueSelections(ui.venueSelections);
-    setTravelOverrides(ui.travelOverrides);
-
-    try {
-      const rawMeta = window.sessionStorage.getItem(TRIP_META_STORAGE_KEY);
-      if (rawMeta) {
-        const meta = JSON.parse(rawMeta) as { startDateIso?: string };
-        setStartDateIso(meta.startDateIso);
-      }
-    } catch {
-      setStartDateIso(undefined);
-    }
-
-    const tripId = searchParams.get("tripId");
-    if (tripId) {
-      const savedRaw = window.localStorage.getItem(SAVED_TRIPS_STORAGE_KEY);
-      if (!savedRaw) {
-        setItinerary(null);
-        return;
-      }
-      try {
-        const savedTrips = JSON.parse(savedRaw) as SavedTrip[];
-        const selectedTrip = savedTrips.find((trip) => trip.id === tripId);
-        if (!selectedTrip) {
-          setItinerary(null);
-          return;
-        }
-        setItinerary({ ...selectedTrip, days: normalizeItineraryDays(selectedTrip.days) });
-        if (selectedTrip.startDateIso) setStartDateIso(selectedTrip.startDateIso);
-        return;
-      } catch {
-        setItinerary(null);
-        return;
-      }
-    }
-
-    const latestRaw = window.sessionStorage.getItem(RESULT_STORAGE_KEY);
-    if (!latestRaw) {
+    hydratedRef.current = false;
+    if (!tripId) {
       setItinerary(null);
       return;
     }
-    try {
-      const parsed = JSON.parse(latestRaw) as GeneratedItinerary;
-      setItinerary({ ...parsed, days: normalizeItineraryDays(parsed.days) });
-    } catch {
-      setItinerary(null);
-    }
-  }, [searchParams]);
+    let cancelled = false;
+    void (async () => {
+      const { data, error } = await getTrip(supabase, tripId);
+      if (cancelled) return;
+      if (error || !data) {
+        setItinerary(null);
+        return;
+      }
+      const raw = (data.data ?? {}) as GeneratedItinerary;
+      setItinerary({ ...raw, days: normalizeItineraryDays(raw.days) });
+      const ui = (data.ui_state ?? {}) as {
+        venueSelections?: Record<string, string>;
+        travelOverrides?: Record<string, number>;
+      };
+      setVenueSelections(ui.venueSelections ?? {});
+      setTravelOverrides(ui.travelOverrides ?? {});
+      setStartDateIso(data.start_date ?? undefined);
+      hydratedRef.current = true;
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tripId]);
 
   useEffect(() => {
-    persistUi(venueSelections, travelOverrides);
-  }, [venueSelections, travelOverrides, persistUi]);
+    if (!hydratedRef.current || !tripId) return;
+    const handle = setTimeout(() => {
+      void updateTripUiState(supabase, tripId, { venueSelections, travelOverrides });
+    }, 500);
+    return () => clearTimeout(handle);
+  }, [venueSelections, travelOverrides, tripId]);
+
+  useEffect(() => {
+    if (!hydratedRef.current || !itinerary || !tripId) return;
+    const handle = setTimeout(() => {
+      void updateTripData(supabase, tripId, itinerary);
+    }, 500);
+    return () => clearTimeout(handle);
+  }, [itinerary, tripId]);
 
   const columns = useMemo(() => {
     if (!itinerary) return [];
@@ -141,9 +115,8 @@ export default function CalendarItineraryClient() {
         travelOverrides
       );
       setItinerary(next);
-      persistItinerary(next);
     },
-    [itinerary, venueSelections, travelOverrides, persistItinerary]
+    [itinerary, venueSelections, travelOverrides]
   );
 
   const handleTransportChange = useCallback(
@@ -161,43 +134,16 @@ export default function CalendarItineraryClient() {
         }),
       };
       setItinerary(next);
-      persistItinerary(next);
     },
-    [itinerary, modalDayIndex, modalRowIndex, persistItinerary]
+    [itinerary, modalDayIndex, modalRowIndex]
   );
 
   const modalDay = modalDayIndex != null ? itinerary?.days[modalDayIndex] : null;
   const modalRow = modalRowIndex != null ? modalDay?.items[modalRowIndex] : null;
 
-  const listHref = searchParams.get("tripId")
-    ? `/itinerary?tripId=${encodeURIComponent(searchParams.get("tripId")!)}`
+  const listHref = tripId
+    ? `/itinerary?tripId=${encodeURIComponent(tripId)}`
     : "/itinerary";
-
-  function handleSaveToProfile() {
-    if (!itinerary || typeof window === "undefined") return;
-    persistItinerary(itinerary);
-
-    let meta: { startDateIso?: string; endDateIso?: string } = {};
-    try {
-      const rawMeta = window.sessionStorage.getItem(TRIP_META_STORAGE_KEY);
-      if (rawMeta) meta = JSON.parse(rawMeta) as typeof meta;
-    } catch {
-      meta = {};
-    }
-
-    const savedTrip: SavedTrip = {
-      ...itinerary,
-      id: crypto.randomUUID(),
-      savedAt: new Date().toISOString(),
-      endDateIso: meta.endDateIso,
-      startDateIso: meta.startDateIso ?? startDateIso,
-    };
-
-    const raw = window.localStorage.getItem(SAVED_TRIPS_STORAGE_KEY);
-    const existing = raw ? (JSON.parse(raw) as SavedTrip[]) : [];
-    window.localStorage.setItem(SAVED_TRIPS_STORAGE_KEY, JSON.stringify([savedTrip, ...existing]));
-    setSaveMessage("Saved to profile.");
-  }
 
   if (!itinerary) {
     return (
@@ -239,29 +185,9 @@ export default function CalendarItineraryClient() {
           >
             List view
           </Link>
-          <button
-            type="button"
-            onClick={handleSaveToProfile}
-            className="inline-flex items-center px-4 py-2 cursor-pointer"
-            style={{
-              border: `1.5px solid ${INK}`,
-              background: INK,
-              color: PAPER,
-              fontFamily: SANS,
-              fontSize: 11,
-              letterSpacing: "0.18em",
-              textTransform: "uppercase",
-              fontWeight: 600,
-            }}
-          >
-            Save to profile
-          </button>
           <Link href="/plan" style={{ fontFamily: SERIF, fontSize: 15, color: INK2 }}>
             Plan another trip &rarr;
           </Link>
-          {saveMessage ? (
-            <span style={{ fontFamily: SERIF, fontSize: 15, color: INK2 }}>{saveMessage}</span>
-          ) : null}
         </div>
       </div>
 

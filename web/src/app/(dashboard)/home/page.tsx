@@ -3,17 +3,50 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { INK, INK2, INK3, PAPER, PAPER2, SANS, SERIF } from "@/components/landing/brand";
-import { SAVED_TRIPS_STORAGE_KEY } from "@/lib/tripStorageKeys";
-import { type SavedTrip, tripIsPast } from "@/lib/tripTypes";
+import { supabase } from "@/lib/supabase";
+import { type GeneratedItinerary, tripIsPast } from "@/lib/tripTypes";
+import { getTrips, type Trip } from "@lib/services/trips";
+
+interface TripCard {
+  id: string;
+  title: string;
+  destination: string;
+  travelDates: string;
+  endDateIso?: string;
+}
+
+function toCard(trip: Trip): TripCard {
+  const data = (trip.data ?? {}) as Partial<GeneratedItinerary>;
+  return {
+    id: trip.id,
+    title: data.title || trip.title,
+    destination: data.destination || trip.destination,
+    travelDates: data.travelDates ?? "",
+    endDateIso: trip.end_date ?? undefined,
+  };
+}
 
 export default function HomePage() {
-  const [savedTrips, setSavedTrips] = useState<SavedTrip[]>([]);
+  const [savedTrips, setSavedTrips] = useState<TripCard[]>([]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const raw = window.localStorage.getItem(SAVED_TRIPS_STORAGE_KEY);
-    const parsed = raw ? (JSON.parse(raw) as SavedTrip[]) : [];
-    setSavedTrips(parsed);
+    let cancelled = false;
+    void (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (cancelled) return;
+      if (!user) {
+        setSavedTrips([]);
+        return;
+      }
+      const { data } = await getTrips(supabase, user.id);
+      if (cancelled) return;
+      setSavedTrips(data.map(toCard));
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const upcomingTrips = savedTrips.filter((t) => !tripIsPast(t.endDateIso));
@@ -61,12 +94,18 @@ export default function HomePage() {
           ) : (
             <div className="mt-2 flex min-h-0 flex-1 flex-col gap-2">
               {latestTrips.map((trip) => (
-                <div key={trip.id} className="p-3" style={{ border: `1px solid ${INK3}`, background: PAPER }}>
+                <Link
+                  key={trip.id}
+                  href={`/itinerary?tripId=${trip.id}`}
+                  className="p-3"
+                  style={{ border: `1px solid ${INK3}`, background: PAPER, textDecoration: "none" }}
+                >
                   <p style={{ fontFamily: SERIF, fontSize: 18, color: INK }}>{trip.title}</p>
                   <p style={{ fontFamily: SERIF, fontSize: 14, color: INK2 }}>
-                    {trip.destination} - {trip.travelDates}
+                    {trip.destination}
+                    {trip.travelDates ? ` - ${trip.travelDates}` : ""}
                   </p>
-                </div>
+                </Link>
               ))}
             </div>
           )}

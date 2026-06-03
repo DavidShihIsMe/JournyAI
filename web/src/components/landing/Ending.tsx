@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState, type FormEvent } from "react";
+import { supabase } from "@/lib/supabase";
+import { syncQuizWithSupabase } from "@/lib/quizSync";
 import {
   INK,
   INK2,
@@ -15,6 +18,8 @@ import {
   SANS,
   SERIF,
 } from "./brand";
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 interface FinalCTAProps {
   onStart: () => void;
@@ -318,6 +323,15 @@ interface SignInModalProps {
 }
 
 export function SignInModal({ open, onClose }: SignInModalProps) {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [formError, setFormError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -326,6 +340,71 @@ export function SignInModal({ open, onClose }: SignInModalProps) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
+
+  useEffect(() => {
+    if (open) return;
+    setEmail("");
+    setPassword("");
+    setEmailError("");
+    setPasswordError("");
+    setFormError("");
+    setLoading(false);
+    setGoogleLoading(false);
+  }, [open]);
+
+  function validate() {
+    let ok = true;
+    if (!email) {
+      setEmailError("Email is required");
+      ok = false;
+    } else if (!EMAIL_RE.test(email)) {
+      setEmailError("Enter a valid email address");
+      ok = false;
+    } else {
+      setEmailError("");
+    }
+    if (!password) {
+      setPasswordError("Password is required");
+      ok = false;
+    } else {
+      setPasswordError("");
+    }
+    return ok;
+  }
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setFormError("");
+    if (!validate()) return;
+
+    setLoading(true);
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    setLoading(false);
+
+    if (error) {
+      setFormError(error.message);
+      return;
+    }
+    if (data?.session) {
+      await syncQuizWithSupabase(supabase, data.session.user.id);
+    }
+    onClose();
+    router.refresh();
+    router.push("/home");
+  }
+
+  async function handleGoogle() {
+    setFormError("");
+    setGoogleLoading(true);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${window.location.origin}/home` },
+    });
+    if (error) {
+      setGoogleLoading(false);
+      setFormError(error.message);
+    }
+  }
 
   if (!open) return null;
   return (
@@ -415,40 +494,56 @@ export function SignInModal({ open, onClose }: SignInModalProps) {
           </div>
         </div>
 
-        <div style={{ marginTop: 28, display: "flex", flexDirection: "column", gap: 12 }}>
-          <div>
-            <label
+        <form
+          onSubmit={handleSubmit}
+          noValidate
+          style={{ marginTop: 28, display: "flex", flexDirection: "column", gap: 12 }}
+        >
+          {formError ? (
+            <p
               style={{
-                fontFamily: SANS,
-                fontSize: 10,
-                fontWeight: 600,
-                letterSpacing: "0.2em",
-                textTransform: "uppercase",
-                color: INK2,
+                margin: 0,
+                padding: "8px 12px",
+                border: `1px solid ${OXBLOOD}`,
+                background: `${OXBLOOD}14`,
+                color: OXBLOOD,
+                fontFamily: SERIF,
+                fontSize: 13,
+                lineHeight: 1.45,
               }}
             >
-              Email
-            </label>
-            <input
-              type="email"
-              defaultValue=""
-              placeholder="reader@journy.co"
-              style={{
-                width: "100%",
-                marginTop: 6,
-                padding: "12px 12px",
-                background: PAPER2,
-                border: `1px solid ${INK}`,
-                borderRadius: 0,
-                fontFamily: SERIF,
-                fontSize: 15,
-                color: INK,
-                boxSizing: "border-box",
-              }}
-            />
-          </div>
-          <Link
-            href="/login"
+              {formError}
+            </p>
+          ) : null}
+
+          <ModalField
+            label="Email"
+            type="email"
+            autoComplete="email"
+            placeholder="reader@journy.co"
+            value={email}
+            onChange={(v) => {
+              setEmail(v);
+              if (emailError) setEmailError("");
+            }}
+            error={emailError}
+          />
+          <ModalField
+            label="Password"
+            type="password"
+            autoComplete="current-password"
+            placeholder=""
+            value={password}
+            onChange={(v) => {
+              setPassword(v);
+              if (passwordError) setPasswordError("");
+            }}
+            error={passwordError}
+          />
+
+          <button
+            type="submit"
+            disabled={loading}
             style={{
               marginTop: 8,
               fontFamily: SANS,
@@ -457,17 +552,17 @@ export function SignInModal({ open, onClose }: SignInModalProps) {
               letterSpacing: "0.2em",
               textTransform: "uppercase",
               padding: "14px 22px",
-              background: INK,
+              background: loading ? INK3 : INK,
               color: PAPER,
               border: `1.5px solid ${INK}`,
               borderRadius: 0,
-              cursor: "pointer",
+              cursor: loading ? "not-allowed" : "pointer",
               textAlign: "center",
-              textDecoration: "none",
+              opacity: loading ? 0.8 : 1,
             }}
           >
-            Send magic link →
-          </Link>
+            {loading ? "Signing in..." : "Continue →"}
+          </button>
 
           <div
             style={{
@@ -483,35 +578,55 @@ export function SignInModal({ open, onClose }: SignInModalProps) {
             <span style={{ flex: 1, borderTop: `0.5px solid ${INK4}` }} />
           </div>
 
-          {["Continue with Google", "Continue with Apple"].map((label) => (
-            <Link
-              key={label}
-              href="/login"
-              style={{
-                fontFamily: SANS,
-                fontSize: 11,
-                fontWeight: 600,
-                letterSpacing: "0.18em",
-                textTransform: "uppercase",
-                padding: "12px 18px",
-                background: PAPER,
-                color: INK,
-                border: `1px solid ${INK}`,
-                borderRadius: 0,
-                cursor: "pointer",
-                textAlign: "center",
-                textDecoration: "none",
-              }}
-            >
-              {label}
+          <button
+            type="button"
+            onClick={handleGoogle}
+            disabled={googleLoading}
+            style={{
+              fontFamily: SANS,
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+              padding: "12px 18px",
+              background: PAPER,
+              color: INK,
+              border: `1px solid ${INK}`,
+              borderRadius: 0,
+              cursor: googleLoading ? "not-allowed" : "pointer",
+              textAlign: "center",
+              opacity: googleLoading ? 0.7 : 1,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 10,
+            }}
+          >
+            <GoogleGlyph />
+            <span>{googleLoading ? "Connecting..." : "Continue with Google"}</span>
+          </button>
+
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              gap: 12,
+              marginTop: 6,
+              fontFamily: SERIF,
+              fontSize: 12,
+              color: INK3,
+            }}
+          >
+            <Link href="/forgot-password" onClick={onClose} style={{ color: INK3 }}>
+              Forgot password?
             </Link>
-          ))}
-        </div>
+          </div>
+        </form>
 
         <div
           style={{
-            marginTop: 24,
-            paddingTop: 16,
+            marginTop: 18,
+            paddingTop: 14,
             borderTop: `0.5px solid ${INK4}`,
             textAlign: "center",
             fontFamily: SERIF,
@@ -522,10 +637,11 @@ export function SignInModal({ open, onClose }: SignInModalProps) {
         >
           — a first-time reader?{" "}
           <Link
-            href="/quiz"
+            href="/signup"
+            onClick={onClose}
             style={{ color: OXBLOOD, textDecoration: "underline", textUnderlineOffset: 3 }}
           >
-            Take the Notation
+            Create an account
           </Link>
         </div>
 
@@ -551,5 +667,87 @@ export function SignInModal({ open, onClose }: SignInModalProps) {
         </button>
       </div>
     </div>
+  );
+}
+
+function ModalField({
+  label,
+  type,
+  autoComplete,
+  placeholder,
+  value,
+  onChange,
+  error,
+}: {
+  label: string;
+  type: "email" | "password";
+  autoComplete: string;
+  placeholder?: string;
+  value: string;
+  onChange: (v: string) => void;
+  error?: string;
+}) {
+  return (
+    <div>
+      <label
+        style={{
+          fontFamily: SANS,
+          fontSize: 10,
+          fontWeight: 600,
+          letterSpacing: "0.2em",
+          textTransform: "uppercase",
+          color: INK2,
+        }}
+      >
+        {label}
+      </label>
+      <input
+        type={type}
+        autoComplete={autoComplete}
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-invalid={Boolean(error)}
+        style={{
+          width: "100%",
+          marginTop: 6,
+          padding: "12px 12px",
+          background: PAPER2,
+          border: `1px solid ${error ? OXBLOOD : INK}`,
+          borderRadius: 0,
+          fontFamily: SERIF,
+          fontSize: 15,
+          color: INK,
+          boxSizing: "border-box",
+          outline: "none",
+        }}
+      />
+      {error ? (
+        <p style={{ margin: "4px 0 0", fontFamily: SERIF, fontSize: 12, color: OXBLOOD }}>{error}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function GoogleGlyph() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path
+        fill="#4285F4"
+        d="M17.64 9.2045c0-.6381-.0573-1.2518-.1636-1.8409H9v3.4814h4.8436c-.2086 1.125-.8431 2.0782-1.7959 2.7164v2.2581h2.9081c1.7018-1.5668 2.6841-3.874 2.6841-6.615z"
+      />
+      <path
+        fill="#34A853"
+        d="M9 18c2.43 0 4.4673-.806 5.9564-2.1805l-2.9081-2.2581c-.806.54-1.8368.8595-3.0483.8595-2.344 0-4.3282-1.5832-5.036-3.7104H.9574v2.3318C2.4382 15.9832 5.4818 18 9 18z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M3.964 10.71c-.18-.54-.2822-1.1168-.2822-1.71s.1023-1.17.2823-1.71V4.9582H.9573A8.9965 8.9965 0 000 9c0 1.4523.3477 2.8268.9573 4.0418L3.964 10.71z"
+      />
+      <path
+        fill="#EA4335"
+        d="M9 3.5795c1.3214 0 2.5077.4541 3.4405 1.346l2.5813-2.5814C13.4632.8918 11.426 0 9 0 5.4818 0 2.4382 2.0168.9573 4.9582L3.964 7.29C4.6718 5.1627 6.656 3.5795 9 3.5795z"
+      />
+    </svg>
   );
 }
